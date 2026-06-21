@@ -1,26 +1,257 @@
 @import "tailwindcss";
 
+/* ═══════════════════════════════════════════════════════════════════
+   1. View Transition Timing & Keyframes
+   EXACT COPY from @skill vercel-react-view-transitions/css-recipes.md
+   ═══════════════════════════════════════════════════════════════════ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --duration-exit: 150ms;
+  --duration-enter: 210ms;
+  --duration-move: 400ms;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@keyframes vt-fade {
+  from { filter: blur(3px); opacity: 0; }
+  to   { filter: blur(0); opacity: 1; }
+}
+@keyframes vt-slide {
+  from { translate: var(--slide-offset); }
+  to   { translate: 0; }
+}
+@keyframes vt-slide-y {
+  from { transform: translateY(var(--slide-y-offset, 10px)); }
+  to   { transform: translateY(0); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   2. Fade
+   ═══════════════════════════════════════════════════════════════════ */
+
+::view-transition-old(.fade-out) {
+  animation: var(--duration-exit) ease-in vt-fade reverse;
+}
+::view-transition-new(.fade-in) {
+  animation: var(--duration-enter) ease-out var(--duration-exit) both vt-fade;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   3. Slide Vertical (Suspense reveal)
+   ═══════════════════════════════════════════════════════════════════ */
+
+::view-transition-old(.slide-down) {
+  animation:
+    var(--duration-exit) ease-out both vt-fade reverse,
+    var(--duration-exit) ease-out both vt-slide-y reverse;
+}
+::view-transition-new(.slide-up) {
+  animation:
+    var(--duration-enter) ease-in var(--duration-exit) both vt-fade,
+    var(--duration-move) ease-in both vt-slide-y;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   4. Directional Navigation — Single-Class Approach
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Forward: list → detail (slide left) */
+::view-transition-new(.nav-forward) {
+  --slide-offset: 60px;
+  animation:
+    var(--duration-enter) ease-out var(--duration-exit) both vt-fade,
+    var(--duration-move) ease-in-out both vt-slide;
+}
+::view-transition-old(.nav-forward) {
+  --slide-offset: -60px;
+  animation:
+    var(--duration-exit) ease-in both vt-fade reverse,
+    var(--duration-move) ease-in-out both vt-slide reverse;
+}
+
+/* Back: detail → list (slide right) */
+::view-transition-new(.nav-back) {
+  --slide-offset: -60px;
+  animation:
+    var(--duration-enter) ease-out var(--duration-exit) both vt-fade,
+    var(--duration-move) ease-in-out both vt-slide;
+}
+::view-transition-old(.nav-back) {
+  --slide-offset: 60px;
+  animation:
+    var(--duration-exit) ease-in both vt-fade reverse,
+    var(--duration-move) ease-in-out both vt-slide reverse;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   5. Scale (dialogs, modals)
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes vt-scale-down {
+  from { transform: scale(1); opacity: 1; }
+  to   { transform: scale(0.85); opacity: 0; }
+}
+@keyframes vt-scale-up {
+  from { transform: scale(0.85); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+::view-transition-old(.scale-out) {
+  animation: var(--duration-exit) ease-in vt-scale-down;
+}
+::view-transition-new(.scale-in) {
+  animation: var(--duration-enter) ease-out var(--duration-exit) both vt-scale-up;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   6. Persistent Element Isolation
+   ═══════════════════════════════════════════════════════════════════ */
+
+::view-transition-group(.persistent) {
+  animation: none;
+  z-index: 100;
+}
+::view-transition-old(.persistent) {
+  display: none;
+}
+::view-transition-new(.persistent) {
+  animation: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   7. Shared Element Morph
+   ═══════════════════════════════════════════════════════════════════ */
+
+::view-transition-group(.morph) {
+  animation-duration: var(--duration-move);
+}
+::view-transition-image-pair(.morph) {
+  animation-name: via-blur;
+}
+@keyframes via-blur {
+  30% { filter: blur(3px); }
+}
+
+/* Text morph — avoids raster scaling artifacts on shared text */
+::view-transition-group(.text-morph) {
+  animation-duration: var(--duration-move);
+}
+::view-transition-old(.text-morph) {
+  display: none;
+}
+::view-transition-new(.text-morph) {
+  animation: none;
+  object-fit: none;
+  object-position: left top;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   8. Reduced Motion (web-design-guidelines + VT accessibility)
+   ═══════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   9. Design Tokens
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --bg: #f8fafc;
+  --fg: #0f172a;
+  --surface: #fff;
+  --border: #e2e8f0;
+  --muted: #64748b;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #6366f1;
+  --radius: 0.75rem;
+  --radius-sm: 0.5rem;
+  --font-sans: var(--font-geist-sans, system-ui, sans-serif);
+  --font-mono: var(--font-geist-mono, monospace);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #0f172a;
+    --fg: #f1f5f9;
+    --surface: #1e293b;
+    --border: #1e293b;
+    --muted: #94a3b8;
+    --accent: #3b82f6;
+    --accent-hover: #60a5fa;
+    --success: #10b981;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #818cf8;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ═══════════════════════════════════════════════════════════════════
+   10. Base
+   ═══════════════════════════════════════════════════════════════════ */
+
+html {
+  color-scheme: light dark;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (max-width: 767px) {
+  input, select, textarea { font-size: 16px !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   11. Utility animations & skeleton
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in { animation: fade-in 0.3s ease-out; }
+
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+.animate-slide-in-left { animation: slide-in-left 0.3s ease-out; }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--border) 25%, color-mix(in srgb, var(--fg) 10%, var(--bg)) 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }

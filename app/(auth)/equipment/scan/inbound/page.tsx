@@ -1,0 +1,122 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { scanInbound } from "@/lib/actions/inventory";
+import { createClient } from "@/lib/supabase/client";
+import { PageHeader } from "@/components/layout/page-header";
+import { Search, ArrowDownToLine, CheckCircle, XCircle } from "lucide-react";
+
+interface EquipmentOption { id: string; equipment_no: string; name: string; status: string; }
+interface WarehouseOption { id: string; name: string; }
+
+export default function ScanInboundPage() {
+  const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
+  const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
+  const [equipSearch, setEquipSearch] = useState("");
+  const [selectedEquipId, setSelectedEquipId] = useState("");
+  const [warehouseId, setWarehouseId] = useState("");
+  const [inspectionResult, setInspectionResult] = useState("NORMAL");
+  const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+
+  const supabase = createClient();
+
+  useEffect(() => {
+    supabase.from("warehouse").select("id, name").order("name").then(({ data }) => setWarehouses(data ?? []));
+  }, []);
+
+  const searchEquipment = useCallback(async () => {
+    let q = supabase.from("equipment").select("id, equipment_no, name, status")
+      .in("status", ["RENTED", "PENDING_INSPECTION"]).eq("scrapped", false).order("equipment_no").limit(30);
+    if (equipSearch) q = q.or(`name.ilike.%${equipSearch}%,equipment_no.ilike.%${equipSearch}%`);
+    const { data } = await q;
+    setEquipment(data ?? []);
+  }, [equipSearch]);
+
+  useEffect(() => { searchEquipment(); }, [searchEquipment]);
+
+  async function handleScan(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedEquipId || !warehouseId) return;
+    setLoading(true);
+    setResult(null);
+    const res = await scanInbound(selectedEquipId, warehouseId, inspectionResult, notes);
+    setResult({ success: res.success, message: res.success ? "入库成功！设备已归还入库。" : res.error });
+    setLoading(false);
+    if (res.success) {
+      setSelectedEquipId(""); setEquipSearch(""); setNotes("");
+      searchEquipment();
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <PageHeader title="归还入库" subtitle="扫描或选择出租中设备，完成归还验收" backUrl="/equipment" />
+
+      {result && (
+        <div className={`rounded-xl border p-4 flex items-start gap-3 ${
+          result.success ? "border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/20"
+            : "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-900/20"}`}>
+          {result.success ? <CheckCircle className="h-5 w-5 text-emerald-600 mt-0.5" /> : <XCircle className="h-5 w-5 text-red-600 mt-0.5" />}
+          <div>
+            <p className={`font-medium ${result.success ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"}`}>
+              {result.success ? "入库成功" : "入库失败"}
+            </p>
+            <p className="text-sm mt-0.5 opacity-80">{result.message}</p>
+          </div>
+        </div>
+      )}
+
+      <Card>
+        <CardHeader><CardTitle className="flex items-center gap-2"><ArrowDownToLine className="h-5 w-5" />归还验收</CardTitle></CardHeader>
+        <form onSubmit={handleScan} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">选择待归还设备 *</label>
+            <div className="relative mb-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
+              <Input value={equipSearch} onChange={e => setEquipSearch(e.target.value)} placeholder="搜索设备名称或编号..." className="pl-9" />
+            </div>
+            {equipment.length > 0 && (
+              <div className="max-h-48 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+                {equipment.map(e => (
+                  <button key={e.id} type="button" onClick={() => { setSelectedEquipId(e.id); setEquipSearch(`${e.equipment_no} - ${e.name}`); }}
+                    className={`w-full text-left px-3 py-2 text-sm border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${
+                      selectedEquipId === e.id ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}>
+                    <span className="font-mono text-xs">{e.equipment_no}</span>
+                    <span className="ml-2">{e.name}</span>
+                    <Badge variant="warning" className="ml-2 text-[10px]">待归还</Badge>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <Select id="warehouseId" label="入库仓库 *" value={warehouseId} onChange={e => setWarehouseId(e.target.value)}
+            options={[{ value: "", label: "请选择仓库" }, ...warehouses.map(w => ({ value: w.id, label: w.name }))]} />
+
+          <Select id="inspectionResult" label="验收结果 *" value={inspectionResult} onChange={e => setInspectionResult(e.target.value)}
+            options={[
+              { value: "NORMAL", label: "✅ 正常" },
+              { value: "DAMAGED", label: "🔧 有损坏" },
+              { value: "MISSING_PARTS", label: "⚠️ 缺少配件" },
+              { value: "DIRTY", label: "🧹 脏污" },
+              { value: "NEEDS_REPAIR", label: "🔩 需要维修" },
+            ]} />
+
+          <Input id="notes" label="验收备注" value={notes} onChange={e => setNotes(e.target.value)}
+            placeholder="损坏描述、缺失配件说明、清洁情况..." />
+
+          <Button type="submit" variant="primary" className="w-full" disabled={loading || !selectedEquipId || !warehouseId}>
+            {loading ? "处理中..." : "确认入库"}
+          </Button>
+        </form>
+      </Card>
+    </div>
+  );
+}
