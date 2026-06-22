@@ -57,12 +57,11 @@ jobs:
             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
             SUPABASE_SERVICE_ROLE_KEY
             DATABASE_URL
-            DEPLOY_PATH
           script: |
             set -e
 
-            DEPLOY_PATH="\${DEPLOY_PATH:-/opt/rentops}"
-            cd "\$DEPLOY_PATH"
+            DEPLOY_PATH="/opt/rentops"
+            cd "$DEPLOY_PATH"
 
             echo "📦 Installing dependencies..."
             npm ci
