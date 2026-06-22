@@ -56,7 +56,6 @@ jobs:
             NEXT_PUBLIC_SUPABASE_URL
             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
             SUPABASE_SERVICE_ROLE_KEY
-            DATABASE_URL
           script: |
             set -e
 
@@ -68,9 +67,6 @@ jobs:
 
             echo "🔨 Building app..."
             npm run build
-
-            echo "🗄️ Running database migrations..."
-            npx drizzle-kit push
 
             echo "📝 Writing environment file..."
             cat > .env << ENVEOF
