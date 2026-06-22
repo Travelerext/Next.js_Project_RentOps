@@ -49,15 +49,24 @@ export async function submitForApproval(
 
   if (error) return { success: false, error: error.message };
 
-  // Notify approvers
-  await supabase.from("notification").insert({
-    recipient_id: profile.id,
-    notification_type: "APPROVAL_PENDING",
-    title: `新的审批请求: ${title}`,
-    content: description ?? title,
-    business_type: businessType,
-    business_id: businessId,
-  });
+  // Notify approvers (find users with manager/supervisor roles)
+  const { data: approvers } = await supabase
+    .from("profiles")
+    .select("id")
+    .in("primary_role", ["SALES_MANAGER", "GENERAL_MANAGER", "SYSTEM_ADMIN", "FINANCE_MANAGER"])
+    .eq("account_status", "ACTIVE");
+
+  if (approvers && approvers.length > 0) {
+    const notifications = approvers.map((a) => ({
+      recipient_id: a.id,
+      notification_type: "APPROVAL_PENDING",
+      title: `新的审批请求: ${title}`,
+      content: description ?? title,
+      business_type: businessType,
+      business_id: businessId,
+    }));
+    await supabase.from("notification").insert(notifications);
+  }
 
   revalidatePath("/approval/pending");
   return { success: true, data: { id: data.id } };
@@ -104,6 +113,15 @@ export async function approveRequest(
     action: "APPROVE",
     comment: comment ?? null,
     acted_at: new Date().toISOString(),
+  });
+
+  // Audit log
+  await supabase.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "APPROVAL_APPROVE",
+    resource_type: "APPROVAL",
+    resource_id: approvalId,
+    detail: { step: currentStep, comment: comment ?? null },
   });
 
   // Count distinct completed steps (steps that have at least one APPROVE action)
@@ -211,6 +229,15 @@ export async function rejectRequest(
     action: "REJECT",
     comment: reason ?? null,
     acted_at: new Date().toISOString(),
+  });
+
+  // Audit log
+  await supabase.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "APPROVAL_REJECT",
+    resource_type: "APPROVAL",
+    resource_id: approvalId,
+    detail: { step: approval.current_step, reason: reason ?? null },
   });
 
   await supabase

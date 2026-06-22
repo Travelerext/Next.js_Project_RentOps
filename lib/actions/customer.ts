@@ -180,6 +180,14 @@ export async function updateCustomer(
 
   if (error) return { success: false, error: error.message };
 
+  await supabase.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "CUSTOMER_UPDATE",
+    resource_type: "CUSTOMER",
+    resource_id: id,
+    detail: { updated_fields: Object.keys(buildUpdate(parsed.data, profile.id)).filter(k => !["updated_by", "updated_at", "version"].includes(k)) },
+  });
+
   revalidatePath("/sales/customers");
   revalidatePath(`/sales/customers/${id}`);
   return { success: true, data: null };

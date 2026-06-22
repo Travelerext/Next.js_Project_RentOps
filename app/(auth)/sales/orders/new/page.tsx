@@ -9,9 +9,9 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/data/data-table";
 import { PageHeader } from "@/components/layout/page-header";
-import { createRentalOrder, addOrderItem, submitOrder, pricingPreview } from "@/lib/actions/rental-order";
+import { createRentalOrder, addOrderItem, submitOrder } from "@/lib/actions/rental-order";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { RISK_LEVELS, CREDIT_LEVELS, EQUIPMENT_STATUS } from "@/lib/constants";
 import {
   ArrowLeft, ArrowRight, Check, Plus, Trash2, AlertTriangle,
@@ -42,13 +42,17 @@ interface SelectedEquipment {
   unitPrice: number;
   depositAmount: number;
   quantity: number;
+  /** Original monthly standard price (captured at selection time) */
+  standardRent: number;
+  /** Original standard deposit (captured at selection time) */
+  standardDeposit: number;
 }
 
 interface PricingResult {
   rentAmount: number; depositAmount: number; totalAmount: number; days: number;
 }
 
-type Step = "customer" | "equipment" | "pricing" | "review";
+type Step = "customer" | "equipment" | "pricing" | "adjust" | "review";
 
 // ─── Component ────────────────────────────────────────────────────────
 
@@ -87,6 +91,10 @@ export default function NewOrderPage() {
   const [otherFee, setOtherFee] = useState("0");
   const [pricingResults, setPricingResults] = useState<Record<string, PricingResult>>({});
   const [remark, setRemark] = useState("");
+
+  // ── Price adjustment ────────────────────────────────────────────
+  const [adjustReasons, setAdjustReasons] = useState<Record<string, string>>({});
+  const [adjustReason, setAdjustReason] = useState("");
 
   // ── Review ────────────────────────────────────────────────────────
   const [draftOrderId, setDraftOrderId] = useState<string | null>(null);
@@ -146,22 +154,48 @@ export default function NewOrderPage() {
       .then(({ data }) => { if (data) setSelectedCustomer(data as CustomerOption); });
   }, []);
 
-  // ── Pricing calculation ───────────────────────────────────────────
-  const calculatePricing = useCallback(async () => {
+  // ── Pricing calculation (auto) ──────────────────────────────────
+  // Recalculate unit prices from monthly standard when mode changes
+  useEffect(() => {
+    setSelectedEquipment(prev => prev.map(item => {
+      const monthlyStandard = item.standardRent;
+      let convertedPrice = monthlyStandard;
+      if (pricingMode === "DAILY") convertedPrice = monthlyStandard / 30;
+      if (pricingMode === "HOURLY") convertedPrice = monthlyStandard / 30 / 8;
+      return { ...item, unitPrice: Math.round(convertedPrice * 100) / 100, pricingMode };
+    }));
+  }, [pricingMode]);
+
+  // Auto-calculate pricing whenever inputs change
+  useEffect(() => {
+    if (step !== "pricing" && step !== "adjust" && step !== "review") return;
     const results: Record<string, PricingResult> = {};
+    let startMs = 0, endMs = 0;
+    if (plannedStartAt) startMs = new Date(plannedStartAt).getTime();
+    if (plannedEndAt) endMs = new Date(plannedEndAt).getTime();
+    const valid = !isNaN(startMs) && !isNaN(endMs) && endMs >= startMs;
+    const totalHours = valid ? (endMs - startMs) / (1000 * 60 * 60) : 0;
+    const days = valid ? Math.ceil((endMs - startMs) / (1000 * 60 * 60 * 24)) + 1 : 0;
+
     for (const item of selectedEquipment) {
-      const fd = new FormData();
-      fd.set("pricingMode", pricingMode);
-      fd.set("unitPrice", String(item.unitPrice));
-      fd.set("quantity", String(item.quantity));
-      fd.set("deposit", String(item.depositAmount));
-      if (plannedStartAt) fd.set("startAt", new Date(plannedStartAt).toISOString());
-      if (plannedEndAt) fd.set("endAt", new Date(plannedEndAt).toISOString());
-      const r = await pricingPreview(fd);
-      results[item.equipmentId] = r;
+      let rent = 0;
+      switch (pricingMode) {
+        case "HOURLY": rent = item.unitPrice * Math.ceil(totalHours) * item.quantity; break;
+        case "DAILY": rent = item.unitPrice * days * item.quantity; break;
+        case "MONTHLY": rent = item.unitPrice * Math.max(1, Math.ceil(days / 30)) * item.quantity; break;
+        default: rent = item.unitPrice * Math.max(1, Math.ceil(days / 30)) * item.quantity;
+      }
+      rent = Math.round(rent * 100) / 100;
+      const dep = Math.round(item.depositAmount * item.quantity * 100) / 100;
+      results[item.equipmentId] = {
+        rentAmount: rent,
+        depositAmount: dep,
+        totalAmount: Math.round((rent + dep) * 100) / 100,
+        days: pricingMode === "HOURLY" ? Math.ceil(totalHours) : days,
+      };
     }
     setPricingResults(results);
-  }, [selectedEquipment, pricingMode, plannedStartAt, plannedEndAt]);
+  }, [selectedEquipment, pricingMode, plannedStartAt, plannedEndAt, step]);
 
   // ── Equipment selection ───────────────────────────────────────────
   function addEquipment(equip: EquipmentOption) {
@@ -175,6 +209,8 @@ export default function NewOrderPage() {
       unitPrice: parseFloat(equip.standard_rent ?? "0"),
       depositAmount: parseFloat(equip.standard_deposit ?? "0"),
       quantity: 1,
+      standardRent: parseFloat(equip.standard_rent ?? "0"),
+      standardDeposit: parseFloat(equip.standard_deposit ?? "0"),
     }]);
   }
 
@@ -198,6 +234,7 @@ export default function NewOrderPage() {
     fd.set("materialFee", materialFee);
     fd.set("otherFee", otherFee);
     if (remark) fd.set("remark", remark);
+    if (adjustReason) fd.set("adjustReason", adjustReason);
     const result = await createRentalOrder(selectedCustomer.id, fd);
     if (!result.success) {
       setError(result.error);
@@ -234,14 +271,52 @@ export default function NewOrderPage() {
     setSubmitting(true); setError("");
     const result = await submitOrder(draftOrderId);
     if (!result.success) { setError(result.error); setSubmitting(false); return; }
-    router.push(`/sales/orders/${draftOrderId}`);
+    if (result.data?.needsApproval) {
+      router.push(`/approval`);
+    } else {
+      router.push(`/sales/orders/${draftOrderId}`);
+    }
   }
 
-  // ── Step navigation ───────────────────────────────────────────────
+  // ── Step navigation with reset ──────────────────────────────────
+  const stepOrder: Step[] = ["customer", "equipment", "pricing", "adjust", "review"];
+
+  function goToStep(target: Step) {
+    // Going back FROM adjust: reset price changes to standard per-mode values
+    if (step === "adjust" && stepOrder.indexOf(target) < stepOrder.indexOf("adjust")) {
+      setSelectedEquipment(prev => prev.map(item => {
+        let convertedPrice = item.standardRent;
+        if (pricingMode === "DAILY") convertedPrice = item.standardRent / 30;
+        if (pricingMode === "HOURLY") convertedPrice = item.standardRent / 30 / 8;
+        return {
+          ...item,
+          unitPrice: Math.round(convertedPrice * 100) / 100,
+          depositAmount: item.standardDeposit,
+        };
+      }));
+      setAdjustReason("");
+    }
+    setStep(target);
+  }
+  // Helper: compare with 2-decimal rounding to avoid float mismatches
+  function pricesEqual(a: number, b: number) {
+    return Math.round(a * 100) === Math.round(b * 100);
+  }
+
   function canProceed(): boolean {
     if (step === "customer") return !!selectedCustomer && !selectedCustomer.is_blacklisted && !selectedCustomer.lock_ordering;
     if (step === "equipment") return selectedEquipment.length > 0;
     if (step === "pricing") return !!plannedStartAt && !!plannedEndAt;
+    if (step === "adjust") {
+      const hasPriceChanges = selectedEquipment.some(item => {
+        const modeStdRent = Math.round((pricingMode === "DAILY" ? item.standardRent / 30
+          : pricingMode === "HOURLY" ? item.standardRent / 30 / 8
+          : item.standardRent) * 100) / 100;
+        return !pricesEqual(item.unitPrice, modeStdRent) ||
+          !pricesEqual(item.depositAmount, item.standardDeposit);
+      });
+      return !hasPriceChanges || !!adjustReason;
+    }
     return true;
   }
 
@@ -254,28 +329,28 @@ export default function NewOrderPage() {
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title="快速开单"
-        subtitle={["选择客户", "选择设备", "租金计算", "确认提交"][["customer","equipment","pricing","review"].indexOf(step)]}
+        subtitle={["选择客户", "选择设备", "租金计算", "改价", "确认提交"][["customer","equipment","pricing","adjust","review"].indexOf(step)]}
         backUrl="/sales/orders"
       />
 
       {/* Step indicator */}
       <div className="flex items-center gap-2">
-        {(["customer","equipment","pricing","review"] as Step[]).map((s, i) => (
+        {(["customer","equipment","pricing","adjust","review"] as Step[]).map((s, i) => (
           <div key={s} className="flex items-center gap-2">
             <button
-              onClick={() => setStep(s)}
+              onClick={() => goToStep(s)}
               className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium transition-colors ${
                 step === s
                   ? "bg-blue-600 text-white"
-                  : step > s || (i < ["customer","equipment","pricing","review"].indexOf(step))
+                  : ["customer","equipment","pricing","adjust","review"].indexOf(step) > i
                     ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
                     : "bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
               }`}
             >
-              {i < ["customer","equipment","pricing","review"].indexOf(step) ? <Check className="h-3 w-3" /> : null}
-              {{customer: "1. 客户", equipment: "2. 设备", pricing: "3. 计价", review: "4. 确认"}[s]}
+              {["customer","equipment","pricing","adjust","review"].indexOf(step) > i ? <Check className="h-3 w-3" /> : null}
+              {{customer: "1. 客户", equipment: "2. 设备", pricing: "3. 计价", adjust: "4. 改价", review: "5. 确认"}[s]}
             </button>
-            {i < 3 ? <ArrowRight className="h-3 w-3 text-zinc-400" /> : null}
+            {i < 4 ? <ArrowRight className="h-3 w-3 text-zinc-400" /> : null}
           </div>
         ))}
       </div>
@@ -407,8 +482,8 @@ export default function NewOrderPage() {
           )}
 
           <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setStep("customer")}><ArrowLeft className="mr-1 h-4 w-4" />上一步</Button>
-            <Button variant="primary" disabled={!canProceed()} onClick={() => { calculatePricing(); setStep("pricing"); }}>
+            <Button variant="outline" onClick={() => goToStep("customer")}><ArrowLeft className="mr-1 h-4 w-4" />上一步</Button>
+            <Button variant="primary" disabled={!canProceed()} onClick={() => setStep("pricing")}>
               下一步：租金计算 <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
@@ -425,26 +500,43 @@ export default function NewOrderPage() {
                 <Select id="pricingMode" label="计费方式" value={pricingMode} onChange={e => setPricingMode(e.target.value)}
                   options={[
                     {value:"HOURLY",label:"按小时"},{value:"DAILY",label:"按天"},
-                    {value:"MONTHLY",label:"按月"},{value:"FIXED",label:"固定价格"},{value:"PROJECT_BASED",label:"按项目"},
+                    {value:"MONTHLY",label:"按月"},
                   ]} />
-                <Input id="plannedStartAt" label="计划开始日期 *" type="date" value={plannedStartAt} onChange={e => setPlannedStartAt(e.target.value)} />
-                <Input id="plannedEndAt" label="计划结束日期 *" type="date" value={plannedEndAt} onChange={e => setPlannedEndAt(e.target.value)} />
+                <Input
+                  id="plannedStartAt"
+                  label={pricingMode === "HOURLY" ? "开始时间 *" : "计划开始日期 *"}
+                  type={pricingMode === "HOURLY" ? "datetime-local" : "date"}
+                  value={plannedStartAt}
+                  onChange={e => setPlannedStartAt(e.target.value)}
+                />
+                <Input
+                  id="plannedEndAt"
+                  label={pricingMode === "HOURLY" ? "结束时间 *" : "计划结束日期 *"}
+                  type={pricingMode === "HOURLY" ? "datetime-local" : "date"}
+                  value={plannedEndAt}
+                  onChange={e => setPlannedEndAt(e.target.value)}
+                />
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <Input id="transportFee" label="运输费" type="number" value={transportFee} onChange={e => setTransportFee(e.target.value)} />
                 <Input id="materialFee" label="材料费" type="number" value={materialFee} onChange={e => setMaterialFee(e.target.value)} />
                 <Input id="otherFee" label="其他费用" type="number" value={otherFee} onChange={e => setOtherFee(e.target.value)} />
               </div>
-              <Button variant="outline" onClick={calculatePricing}><Calculator className="mr-1 h-4 w-4" />重新计算</Button>
+              <p className="mt-2 text-xs text-zinc-400">费用将根据租期和计费方式自动计算</p>
             </div>
           </Card>
 
           {/* Pricing results */}
           <Card>
-            <CardHeader><CardTitle>费用明细</CardTitle></CardHeader>
+            <CardHeader><CardTitle>费用明细（自动计算）</CardTitle></CardHeader>
             <div>
+              {selectedEquipment.length === 0 ? (
+                <p className="p-4 text-sm text-zinc-400">请先在步骤 2 选择设备</p>
+              ) : !plannedStartAt || !plannedEndAt ? (
+                <p className="p-4 text-sm text-zinc-400">请填写租期后自动计算</p>
+              ) : (
               <table className="w-full text-sm">
-                <thead><tr className="border-b"><th className="p-2 text-left">设备</th><th className="p-2 text-right">单价</th><th className="p-2 text-center">天数</th><th className="p-2 text-right">租金</th><th className="p-2 text-right">押金</th><th className="p-2 text-right">小计</th></tr></thead>
+                <thead><tr className="border-b"><th className="p-2 text-left">设备</th><th className="p-2 text-right">单价</th><th className="p-2 text-center">{pricingMode === "HOURLY" ? "小时" : "天数"}</th><th className="p-2 text-right">租金</th><th className="p-2 text-right">押金</th><th className="p-2 text-right">小计</th></tr></thead>
                 <tbody>
                   {selectedEquipment.map(item => {
                     const r = pricingResults[item.equipmentId];
@@ -469,19 +561,132 @@ export default function NewOrderPage() {
                   </tr>
                 </tfoot>
               </table>
+              )}
             </div>
           </Card>
 
           <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setStep("equipment")}><ArrowLeft className="mr-1 h-4 w-4" />上一步</Button>
-            <Button variant="primary" onClick={handleCreateDraft} disabled={!canProceed() || loading}>
-              {loading ? "创建中..." : "创建草稿订单"} <FileText className="ml-1 h-4 w-4" />
+            <Button variant="outline" onClick={() => goToStep("equipment")}><ArrowLeft className="mr-1 h-4 w-4" />上一步</Button>
+            <Button variant="primary" onClick={() => setStep("adjust")} disabled={!canProceed()}>
+              下一步：调整价格 <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </div>
         </div>
       )}
 
-      {/* ── Step 4: Review ───────────────────────────────────────── */}
+      {/* ── Step 4: Price Adjustment ───────────────────────────── */}
+      {step === "adjust" && (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader><CardTitle className="flex items-center gap-2"><Calculator className="h-5 w-5" />价格调整</CardTitle></CardHeader>
+            <div>
+              <p className="mb-4 text-sm text-zinc-500">
+                {pricingMode === "HOURLY" ? "确认或调整每台设备的时租单价。" :
+                 pricingMode === "DAILY" ? "确认或调整每台设备的日租单价。" :
+                 "确认或调整每台设备的月租单价。"}修改后需填写原因。
+              </p>
+              <div className="space-y-3">
+                {selectedEquipment.map(item => {
+                  const r = pricingResults[item.equipmentId];
+                  // Per-mode standard price
+                  const modeStandardRent = Math.round((pricingMode === "DAILY" ? item.standardRent / 30
+                    : pricingMode === "HOURLY" ? item.standardRent / 30 / 8
+                    : item.standardRent) * 100) / 100;
+                  const rentLabel = pricingMode === "HOURLY" ? "时租金" : pricingMode === "DAILY" ? "日租金" : "月租金";
+                  const rentDiscount = modeStandardRent > 0
+                    ? ((modeStandardRent - item.unitPrice) / modeStandardRent * 100)
+                    : 0;
+                  const depReduction = item.standardDeposit > 0
+                    ? ((item.standardDeposit - item.depositAmount) / item.standardDeposit * 100)
+                    : 0;
+                  const hasRentChange = modeStandardRent > 0 && !pricesEqual(item.unitPrice, modeStandardRent);
+                  const hasDepChange = item.standardDeposit > 0 && !pricesEqual(item.depositAmount, item.standardDeposit);
+                  return (
+                    <div key={item.equipmentId} className={`rounded-lg border p-3 ${hasRentChange || hasDepChange ? "border-amber-300 bg-amber-50/50 dark:border-amber-700 dark:bg-amber-900/10" : "border-zinc-200 dark:border-zinc-700"}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-medium text-sm">{item.name}</span>
+                        <span className="text-xs text-zinc-400">{item.equipmentNo}</span>
+                        {(hasRentChange || hasDepChange) && <Badge variant="warning" className="text-[10px]">已调价</Badge>}
+                      </div>
+                      {/* Rent row */}
+                      <div className="flex items-center gap-3 mb-1.5">
+                        <span className="text-xs text-zinc-500 w-14 shrink-0">{rentLabel}</span>
+                        <span className="text-xs text-zinc-400 line-through">{modeStandardRent > 0 ? `¥${modeStandardRent.toLocaleString()}` : "-"}</span>
+                        <span className="text-xs text-zinc-300">→</span>
+                        <div className="relative flex-1 max-w-[160px]">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-zinc-400">¥</span>
+                          <Input
+                            type="number"
+                            value={item.unitPrice}
+                            onChange={e => updateEquipmentField(item.equipmentId, "unitPrice", parseFloat(e.target.value) || 0)}
+                            className="pl-7 text-right text-sm"
+                          />
+                        </div>
+                        {rentDiscount > 0 && (
+                          <span className={`text-xs font-medium whitespace-nowrap ${rentDiscount > 20 ? "text-red-600" : "text-amber-600"}`}>
+                            -{rentDiscount.toFixed(0)}%
+                            {rentDiscount > 20 && <AlertTriangle className="ml-0.5 inline h-3 w-3" />}
+                          </span>
+                        )}
+                        {r && (
+                          <span className="text-xs text-zinc-500 whitespace-nowrap">
+                            应收 ¥{r.rentAmount.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                      {/* Deposit row */}
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-zinc-500 w-14 shrink-0">押金</span>
+                        <span className="text-xs text-zinc-400 line-through">{item.standardDeposit > 0 ? `¥${item.standardDeposit.toLocaleString()}` : "-"}</span>
+                        <span className="text-xs text-zinc-300">→</span>
+                        <div className="relative flex-1 max-w-[160px]">
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-zinc-400">¥</span>
+                          <Input
+                            type="number"
+                            value={item.depositAmount}
+                            onChange={e => updateEquipmentField(item.equipmentId, "depositAmount", parseFloat(e.target.value) || 0)}
+                            className="pl-7 text-right text-sm"
+                          />
+                        </div>
+                        {depReduction > 0 && (
+                          <span className="text-xs text-amber-600 font-medium whitespace-nowrap">-{depReduction.toFixed(0)}%</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </Card>
+
+          {/* Price change reason */}
+          <Card>
+            <CardHeader><CardTitle>改价原因</CardTitle></CardHeader>
+            <Input
+              id="adjustReason"
+              label={selectedEquipment.some(item => {
+                const modeStdRent = Math.round((pricingMode === "DAILY" ? item.standardRent / 30
+                  : pricingMode === "HOURLY" ? item.standardRent / 30 / 8
+                  : item.standardRent) * 100) / 100;
+                return !pricesEqual(item.unitPrice, modeStdRent) ||
+                  !pricesEqual(item.depositAmount, item.standardDeposit);
+              }) ? "请填写改价原因（必填）" : "改价原因（可选）"}
+              value={adjustReason}
+              onChange={e => setAdjustReason(e.target.value)}
+              placeholder="如：老客户优惠、长期合作折扣、设备状态调整等"
+            />
+          </Card>
+
+          <div className="flex justify-between">
+            <Button variant="outline" onClick={() => goToStep("pricing")}><ArrowLeft className="mr-1 h-4 w-4" />上一步</Button>
+            <Button variant="primary" onClick={() => setStep("review")} disabled={!canProceed()}>
+              下一步：确认提交 <ArrowRight className="ml-1 h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 5: Review ───────────────────────────────────────── */}
       {step === "review" && (
         <div className="space-y-4">
           <Card>
@@ -491,23 +696,45 @@ export default function NewOrderPage() {
                 <div><span className="text-zinc-500">客户：</span>{selectedCustomer?.name}</div>
                 <div><span className="text-zinc-500">订单号：</span>{draftOrderId ? "已创建" : "待创建"}</div>
                 <div><span className="text-zinc-500">计费方式：</span>{{HOURLY:"按小时",DAILY:"按天",MONTHLY:"按月",FIXED:"固定价",PROJECT_BASED:"按项目"}[pricingMode]}</div>
-                <div><span className="text-zinc-500">租期：</span>{plannedStartAt ? formatDate(plannedStartAt) : "-"} ~ {plannedEndAt ? formatDate(plannedEndAt) : "-"}</div>
+                <div><span className="text-zinc-500">租期：</span>{plannedStartAt ? (pricingMode === "HOURLY" ? formatDateTime(plannedStartAt) : formatDate(plannedStartAt)) : "-"} ~ {plannedEndAt ? (pricingMode === "HOURLY" ? formatDateTime(plannedEndAt) : formatDate(plannedEndAt)) : "-"}</div>
                 <div><span className="text-zinc-500">设备数量：</span>{selectedEquipment.length} 台</div>
                 <div><span className="text-zinc-500">租金合计：</span><span className="font-semibold">{formatCurrency(totalRent)}</span></div>
                 <div><span className="text-zinc-500">押金合计：</span>{formatCurrency(totalDeposit)}</div>
                 <div><span className="text-zinc-500">运输/材料/其他：</span>{formatCurrency(parseFloat(transportFee) + parseFloat(materialFee) + parseFloat(otherFee))}</div>
               </div>
               <Input id="remark" label="备注" value={remark} onChange={e => setRemark(e.target.value)} />
+              {adjustReason && (
+                <div className="rounded-lg bg-amber-50 p-2 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+                  改价原因：{adjustReason}
+                </div>
+              )}
+              {!draftOrderId && (
+                <Button variant="primary" onClick={handleCreateDraft} disabled={loading} className="w-full">
+                  {loading ? "创建中..." : "创建草稿订单"} <FileText className="ml-1 h-4 w-4" />
+                </Button>
+              )}
               {draftOrderId && (
                 <div className="rounded-lg bg-green-50 p-3 text-sm text-green-700 dark:bg-green-900/20 dark:text-green-400">
                   <Check className="mr-1 inline h-4 w-4" />草稿订单已创建，确认无误后点击提交
+                </div>
+              )}
+              {draftOrderId && adjustReason && (
+                <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+                  <AlertTriangle className="mr-1 inline h-4 w-4" />
+                  该订单存在价格调整，可能需要审批。提交后系统将自动判断。
+                </div>
+              )}
+              {draftOrderId && selectedCustomer?.risk_level === "HIGH" && (
+                <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+                  <AlertTriangle className="mr-1 inline h-4 w-4" />
+                  客户风险等级为 HIGH，订单可能需要审批。
                 </div>
               )}
             </div>
           </Card>
 
           <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setStep("pricing")}><ArrowLeft className="mr-1 h-4 w-4" />上一步</Button>
+            <Button variant="outline" onClick={() => goToStep("adjust")}><ArrowLeft className="mr-1 h-4 w-4" />上一步</Button>
             <Button variant="primary" onClick={handleSubmit} disabled={!draftOrderId || submitting}>
               {submitting ? "提交中..." : "提交订单"} <ArrowRight className="ml-1 h-4 w-4" />
             </Button>

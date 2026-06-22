@@ -124,6 +124,13 @@ export async function addOrderItem(
   } = await supabase.auth.getUser();
   if (!user) return { success: false, error: "未登录" };
 
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("supabase_user_id", user.id)
+    .maybeSingle();
+  if (!profile) return { success: false, error: "用户档案不存在" };
+
   const equipmentId = formData.get("equipmentId") as string;
   const pricingMode = (formData.get("pricingMode") as string) || "MONTHLY";
   const unitPrice = parseFloat((formData.get("unitPrice") as string) || "0") || 0;
@@ -195,13 +202,124 @@ export async function addOrderItem(
 
   if (error) return { success: false, error: error.message };
 
+  await supabase.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "ORDER_ITEM_ADD",
+    resource_type: "ORDER_ITEM",
+    resource_id: orderId,
+    detail: { equipment_id: equipmentId, pricing_mode: pricingMode, rent_amount: rentAmount },
+  });
+
   revalidatePath(`/sales/orders/${orderId}`);
   return { success: true, data: null };
 }
 
+// ─── Approval rule constants ──────────────────────────────────────────────
+const DISCOUNT_APPROVAL_THRESHOLD = 0.20;   // 20%+ discount triggers approval
+const HIGH_AMOUNT_THRESHOLD = 50000;         // ¥50,000+ triggers approval
+const DEPOSIT_REDUCTION_THRESHOLD = 0.30;    // 30%+ deposit reduction triggers approval
+
+interface ApprovalRuleResult {
+  needsApproval: boolean;
+  reasons: string[];
+}
+
+async function evaluateApprovalRules(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  orderId: string,
+  customerId: string,
+  totalRent: number,
+  totalDeposit: number
+): Promise<ApprovalRuleResult> {
+  const reasons: string[] = [];
+
+  // 1. Check customer risk level
+  const { data: customer } = await supabase
+    .from("customer")
+    .select("risk_level, credit_level, is_blacklisted, lock_ordering, credit_limit")
+    .eq("id", customerId)
+    .single();
+
+  if (!customer) {
+    return { needsApproval: true, reasons: ["客户信息不存在"] };
+  }
+
+  if (customer.risk_level === "CRITICAL") {
+    reasons.push("客户风险等级为CRITICAL");
+  } else if (customer.risk_level === "HIGH") {
+    reasons.push("客户风险等级为HIGH");
+  }
+
+  // 2. Check discount against standard prices
+  const { data: items } = await supabase
+    .from("rental_order_item")
+    .select("actual_unit_price, standard_unit_price, deposit_amount, equipment_id")
+    .eq("order_id", orderId);
+
+  if (items) {
+    // Check price discount
+    for (const item of items) {
+      const actualPrice = parseFloat(item.actual_unit_price ?? "0");
+      const standardPrice = parseFloat(item.standard_unit_price ?? "0");
+      if (standardPrice > 0 && actualPrice < standardPrice) {
+        const discount = (standardPrice - actualPrice) / standardPrice;
+        if (discount > DISCOUNT_APPROVAL_THRESHOLD) {
+          reasons.push(`设备单价折扣超过${(DISCOUNT_APPROVAL_THRESHOLD * 100).toFixed(0)}%`);
+          break; // Only need one reason
+        }
+      }
+    }
+
+    // Check deposit reduction against equipment standard deposits
+    const equipmentIds = items.map((i) => i.equipment_id);
+    const { data: equipment } = await supabase
+      .from("equipment")
+      .select("id, standard_deposit")
+      .in("id", equipmentIds);
+
+    if (equipment) {
+      let totalStandardDeposit = 0;
+      for (const eq of equipment) {
+        totalStandardDeposit += parseFloat(eq.standard_deposit ?? "0");
+      }
+      if (totalStandardDeposit > 0 && totalDeposit < totalStandardDeposit) {
+        const reduction = (totalStandardDeposit - totalDeposit) / totalStandardDeposit;
+        if (reduction > DEPOSIT_REDUCTION_THRESHOLD) {
+          reasons.push(`押金减免超过${(DEPOSIT_REDUCTION_THRESHOLD * 100).toFixed(0)}%`);
+        }
+      }
+    }
+  }
+
+  // 3. Check high amount
+  if (totalRent + totalDeposit > HIGH_AMOUNT_THRESHOLD) {
+    reasons.push(`订单总金额超过¥${HIGH_AMOUNT_THRESHOLD.toLocaleString()}`);
+  }
+
+  // 4. Check credit limit
+  if (customer.credit_limit > 0) {
+    const { data: unsettled } = await supabase
+      .from("receivable")
+      .select("unpaid_amount")
+      .eq("customer_id", customerId)
+      .in("status", ["UNPAID", "PARTIAL", "OVERDUE"]);
+
+    const totalUnsettled = unsettled?.reduce(
+      (sum, r) => sum + parseFloat(r.unpaid_amount ?? "0"),
+      0
+    ) ?? 0;
+
+    if (totalUnsettled + totalRent > parseFloat(customer.credit_limit.toString())) {
+      reasons.push("超出客户信用额度");
+    }
+  }
+
+  return { needsApproval: reasons.length > 0, reasons };
+}
+
 export async function submitOrder(
   orderId: string
-): Promise<ActionResult<null>> {
+): Promise<ActionResult<{ needsApproval: boolean; reasons: string[] }>> {
   const supabase = await createClient();
 
   const {
@@ -216,32 +334,66 @@ export async function submitOrder(
     .maybeSingle();
   if (!profile) return { success: false, error: "用户档案不存在" };
 
+  // Load order with customer info
+  const { data: order } = await supabase
+    .from("rental_order")
+    .select("id, order_no, customer_id, order_status")
+    .eq("id", orderId)
+    .single();
+
+  if (!order) return { success: false, error: "订单不存在" };
+  if (order.order_status !== "DRAFT")
+    return { success: false, error: "只能提交草稿状态的订单" };
+
   // Check order has items
   const { data: items, error: itemsError } = await supabase
     .from("rental_order_item")
-    .select("id, equipment_id")
+    .select("id, equipment_id, actual_unit_price, standard_unit_price, deposit_amount")
     .eq("order_id", orderId);
 
   if (itemsError) return { success: false, error: itemsError.message };
   if (!items || items.length === 0)
     return { success: false, error: "订单没有设备明细" };
 
-  // Update totals from items
-  const { data: totals } = await supabase
-    .from("rental_order_item")
-    .select("rent_amount, deposit_amount")
-    .eq("order_id", orderId);
+  // Re-validate equipment availability
+  const equipmentIds = items.map((item) => item.equipment_id);
+  const { data: equipmentStatus } = await supabase
+    .from("equipment")
+    .select("id, status")
+    .in("id", equipmentIds);
 
+  const unavailableEquipment = equipmentStatus?.filter(
+    (e) => e.status !== "IN_STOCK"
+  );
+  if (unavailableEquipment && unavailableEquipment.length > 0) {
+    return {
+      success: false,
+      error: `以下设备状态已变更，无法提交：${unavailableEquipment.map((e) => e.id.slice(0, 8)).join(", ")}`,
+    };
+  }
+
+  // Calculate totals
   const totalRent =
-    totals?.reduce((sum, i) => sum + parseFloat(i.rent_amount ?? "0"), 0) ?? 0;
+    items.reduce((sum, i) => sum + parseFloat(i.actual_unit_price ?? "0"), 0);
   const totalDeposit =
-    totals?.reduce((sum, i) => sum + parseFloat(i.deposit_amount ?? "0"), 0) ??
-    0;
+    items.reduce((sum, i) => sum + parseFloat(i.deposit_amount ?? "0"), 0);
 
+  // ── Evaluate approval rules ──
+  const ruleResult = await evaluateApprovalRules(
+    supabase,
+    orderId,
+    order.customer_id,
+    totalRent,
+    totalDeposit
+  );
+
+  const newStatus = ruleResult.needsApproval ? "PENDING_APPROVAL" : "APPROVED";
+
+  // Update order
   const { error } = await supabase
     .from("rental_order")
     .update({
-      order_status: "PENDING_APPROVAL",
+      order_status: newStatus,
       total_rent_amount: totalRent,
       total_deposit_amount: totalDeposit,
       receivable_amount: totalRent + totalDeposit,
@@ -254,42 +406,48 @@ export async function submitOrder(
 
   if (error) return { success: false, error: error.message };
 
-  // Lock all equipment in the order
-  const equipmentIds = items.map((item) => item.equipment_id);
-  await supabase
-    .from("equipment")
-    .update({ status: "LOCKED", updated_by: profile.id, updated_at: new Date().toISOString() })
-    .in("id", equipmentIds);
+  // Lock equipment (only for orders that go to approval — auto-approved orders
+  // will have equipment status updated by contract activation instead)
+  if (ruleResult.needsApproval) {
+    await supabase
+      .from("equipment")
+      .update({ status: "LOCKED", updated_by: profile.id, updated_at: new Date().toISOString() })
+      .in("id", equipmentIds);
+  }
 
+  // Audit log
   await supabase.from("audit_log").insert({
     actor_id: profile.id,
     action: "ORDER_SUBMIT",
     resource_type: "ORDER",
     resource_id: orderId,
-    detail: { total_rent: totalRent, total_deposit: totalDeposit },
+    detail: {
+      order_no: order.order_no,
+      total_rent: totalRent,
+      total_deposit: totalDeposit,
+      needs_approval: ruleResult.needsApproval,
+      approval_reasons: ruleResult.reasons,
+    },
   });
 
-  // Create approval for the order
-  const { data: order } = await supabase
-    .from("rental_order")
-    .select("order_no, customer_id")
-    .eq("id", orderId)
-    .single();
-
-  if (order) {
-    const customerName = (order as Record<string, unknown>).customer_id ?? "";
+  // Create approval if needed
+  if (ruleResult.needsApproval) {
     await submitForApproval(
       "ORDER",
       orderId,
       "ORDER_APPROVAL",
-      `订单审批: ${(order as Record<string, unknown>).order_no}`,
-      `租金: ¥${totalRent.toFixed(2)} | 押金: ¥${totalDeposit.toFixed(2)}`
+      `订单审批: ${order.order_no}`,
+      `租金: ¥${totalRent.toFixed(2)} | 押金: ¥${totalDeposit.toFixed(2)}\n触发原因: ${ruleResult.reasons.join("; ")}`
     );
   }
 
   revalidatePath("/sales/orders");
   revalidatePath(`/sales/orders/${orderId}`);
-  return { success: true, data: null };
+  revalidatePath("/approval/pending");
+  return {
+    success: true,
+    data: { needsApproval: ruleResult.needsApproval, reasons: ruleResult.reasons },
+  };
 }
 
 export async function pricingPreview(formData: FormData) {
@@ -383,6 +541,14 @@ export async function deleteDraftOrder(
 
   if (error) return { success: false, error: error.message };
 
+  await supabase.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "ORDER_DELETE",
+    resource_type: "ORDER",
+    resource_id: orderId,
+    detail: { order_no: order.order_no },
+  });
+
   revalidatePath("/sales/orders");
   return { success: true, data: null };
 }
@@ -451,6 +617,22 @@ export async function cancelOrder(
     .eq("id", orderId);
 
   if (error) return { success: false, error: error.message };
+
+  // Resolve profile for audit
+  const { data: canceller } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("supabase_user_id", user.id)
+    .maybeSingle();
+  if (canceller) {
+    await supabase.from("audit_log").insert({
+      actor_id: canceller.id,
+      action: "ORDER_CANCEL",
+      resource_type: "ORDER",
+      resource_id: orderId,
+      detail: { order_no: order.order_no, previous_status: order.order_status },
+    });
+  }
 
   revalidatePath("/sales/orders");
   return { success: true, data: null };

@@ -286,6 +286,22 @@ export async function submitContractForSigning(
     .eq("id", contractId);
   if (error) return { success: false, error: error.message };
 
+  // Resolve profile for audit
+  const { data: submitter } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("supabase_user_id", user.id)
+    .maybeSingle();
+  if (submitter) {
+    await supabase.from("audit_log").insert({
+      actor_id: submitter.id,
+      action: "CONTRACT_SUBMIT_SIGN",
+      resource_type: "CONTRACT",
+      resource_id: contractId,
+      detail: { contract_status: "PENDING_SIGN" },
+    });
+  }
+
   revalidatePath("/sales/contracts");
   return { success: true, data: null };
 }
@@ -326,6 +342,14 @@ export async function signContract(
     })
     .eq("id", contractId);
   if (error) return { success: false, error: error.message };
+
+  await supabase.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "CONTRACT_SIGN",
+    resource_type: "CONTRACT",
+    resource_id: contractId,
+    detail: { signed_at: now },
+  });
 
   revalidatePath("/sales/contracts");
   return { success: true, data: null };

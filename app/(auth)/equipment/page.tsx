@@ -372,13 +372,13 @@ async function SupervisorView() {
   }));
 
   // ── Insurance / inspection placeholders ────────────────────────────
-  // Replace with date-range filtering when insurance_expiry_date and
+  // TODO: Replace with date-range filtering when insurance_expiry_date and
   // inspection_date columns are added to the equipment table.
   const total = totalCount ?? 0;
   const rented = rentedCount ?? 0;
   const utilizationPct = total > 0 ? Math.round((rented / total) * 100) : 0;
-  const expiringInsuranceCount = total;
-  const expiringInspectionCount = total;
+  const expiringInsuranceCount = 0; // P2: requires insurance_expiry_date column
+  const expiringInspectionCount = 0; // P2: requires inspection_date column
 
   // ── Transfer table columns ─────────────────────────────────────────
 

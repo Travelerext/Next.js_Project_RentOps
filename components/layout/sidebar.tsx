@@ -160,11 +160,16 @@ interface Props {
 function useIsActive() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  return (href: string): boolean => {
+
+  return (href: string, exact = false): boolean => {
     // Split href into path and query
     const [hrefPath, hrefQuery] = href.split("?");
-    // Path must match exactly or be a sub-path
-    if (pathname !== hrefPath && !pathname.startsWith(hrefPath + "/")) return false;
+    // Path matching: exact mode only matches the same path;
+    // non-exact (parent) mode also matches sub-paths.
+    const pathMatches = exact
+      ? pathname === hrefPath
+      : pathname === hrefPath || pathname.startsWith(hrefPath + "/");
+    if (!pathMatches) return false;
     // If href has query params, they must all match current URL
     if (hrefQuery) {
       const hrefParams = new URLSearchParams(hrefQuery);
@@ -181,6 +186,10 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
   const isActive = useIsActive();
   const pathname = usePathname();
 
+  // Stable ref for callbacks to avoid unnecessary effect re-runs
+  const onMobileCloseRef = { current: onMobileClose };
+  onMobileCloseRef.current = onMobileClose;
+
   // Base items + role-specific extras
   const baseItems = MENUS[dashboard] ?? [];
   const extras = ROLE_EXTRA_LINKS[primaryRole ?? ""] ?? [];
@@ -191,10 +200,10 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
   // Close on Escape
   useEffect(() => {
     if (!mobileOpen) return;
-    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") onMobileClose(); };
+    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") onMobileCloseRef.current(); };
     document.addEventListener("keydown", fn);
     return () => document.removeEventListener("keydown", fn);
-  }, [mobileOpen, onMobileClose]);
+  }, [mobileOpen]);
 
   // Lock body scroll
   useEffect(() => {
@@ -203,7 +212,7 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
   }, [mobileOpen]);
 
   // Close mobile on route change
-  useEffect(() => { onMobileClose(); }, [pathname, onMobileClose]);
+  useEffect(() => { onMobileCloseRef.current(); }, [pathname]);
 
   // Role label for display
   const roleLabel = primaryRole ? {
@@ -258,9 +267,49 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
 
       {/* Navigation */}
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2 overscroll-contain" role="navigation" aria-label="主导航">
-        {items.map((item) => {
-          const active = isActive(item.href);
+        {items.map((item, index) => {
           const hasChildren = !!item.children?.length;
+
+          // ── Active detection ───────────────────────────────────
+          // Items WITH children: always use prefix-match (section header),
+          // BUT defer to a childless sibling that has the same path with
+          // matching query params (e.g. "我的工单" overrides "全部工单").
+          // Items WITHOUT children: use longest-prefix-match among siblings
+          // so that e.g. /equipment/catalog/new doesn't also highlight
+          // /equipment/catalog.
+          const active = (() => {
+            if (hasChildren) {
+              // Suppress if a childless sibling with same path + matching
+              // query params takes precedence
+              const overridden = items.some(
+                (other) =>
+                  other.href !== item.href &&
+                  !other.children?.length &&
+                  other.href.startsWith(item.href + "?") &&
+                  isActive(other.href)
+              );
+              if (overridden) return false;
+              return isActive(item.href);
+            }
+
+            // Dashboard root (first item) always uses exact match
+            if (index === 0) return isActive(item.href, true);
+
+            // For childless items: only active if no OTHER childless sibling
+            // has a longer href (or same path + extra params) that also
+            // matches the current path.
+            if (!isActive(item.href)) return false;
+            const longerMatch = items.some(
+              (other) =>
+                other.href !== item.href &&
+                !other.children?.length &&
+                other.href.length > item.href.length &&
+                other.href.startsWith(item.href) &&
+                isActive(other.href)
+            );
+            return !longerMatch;
+          })();
+
           const Icon = item.icon;
 
           return (
@@ -293,7 +342,7 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
               {!collapsed && hasChildren && (
                 <div className="ml-8 mt-0.5 space-y-0.5 border-l border-zinc-200 pl-3 dark:border-zinc-700">
                   {item.children!.map((child) => {
-                    const childActive = pathname === child.href || pathname.startsWith(child.href + "/");
+                    const childActive = isActive(child.href, true);
                     return (
                       <Link
                         key={child.href}

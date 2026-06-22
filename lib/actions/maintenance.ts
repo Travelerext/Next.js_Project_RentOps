@@ -199,6 +199,14 @@ export async function startRepair(workOrderId: string): Promise<ActionResult<nul
     .eq("id", workOrderId);
   if (error) return { success: false, error: error.message };
 
+  await supabase.from("audit_log").insert({
+    actor_id: auth.profileId,
+    action: "MAINTENANCE_START",
+    resource_type: "MAINTENANCE",
+    resource_id: workOrderId,
+    detail: { repair_started_at: new Date().toISOString() },
+  });
+
   revalidatePath(`/maintenance/work-orders/${workOrderId}`);
   return { success: true, data: null };
 }
@@ -300,6 +308,14 @@ export async function verifyWorkOrder(workOrderId: string): Promise<ActionResult
     change_reason: "维修验收通过",
     business_type: "MAINTENANCE_OUT", business_id: workOrderId,
     changed_by: auth.profileId,
+  });
+
+  await supabase.from("audit_log").insert({
+    actor_id: auth.profileId,
+    action: "MAINTENANCE_VERIFY",
+    resource_type: "MAINTENANCE",
+    resource_id: workOrderId,
+    detail: { equipment_id: wo.equipment_id },
   });
 
   revalidatePath("/maintenance/work-orders");

@@ -11,6 +11,8 @@ const protectedPrefixes = [
   "/maintenance",
   "/approval",
   "/customer",
+  "/profile",
+  "/notifications",
 ];
 
 function isProtected(path: string) {
@@ -36,7 +38,7 @@ const ROLE_ROUTE_MAP: Record<string, string[]> = {
 };
 
 // Shared routes accessible by all roles
-const SHARED_PREFIXES = ["/equipment/catalog"];
+const SHARED_PREFIXES = ["/equipment/catalog", "/profile", "/notifications"];
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;

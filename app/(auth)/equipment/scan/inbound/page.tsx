@@ -11,7 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/layout/page-header";
 import { Search, ArrowDownToLine, CheckCircle, XCircle } from "lucide-react";
 
-interface EquipmentOption { id: string; equipment_no: string; name: string; status: string; }
+interface EquipmentOption { id: string; equipment_no: string; name: string; status: string; current_order_id: string | null; current_contract_id: string | null; }
 interface WarehouseOption { id: string; name: string; }
 
 export default function ScanInboundPage() {
@@ -32,7 +32,7 @@ export default function ScanInboundPage() {
   }, []);
 
   const searchEquipment = useCallback(async () => {
-    let q = supabase.from("equipment").select("id, equipment_no, name, status")
+    let q = supabase.from("equipment").select("id, equipment_no, name, status, current_order_id, current_contract_id")
       .in("status", ["RENTED", "PENDING_INSPECTION"]).eq("scrapped", false).order("equipment_no").limit(30);
     if (equipSearch) q = q.or(`name.ilike.%${equipSearch}%,equipment_no.ilike.%${equipSearch}%`);
     const { data } = await q;
@@ -46,7 +46,15 @@ export default function ScanInboundPage() {
     if (!selectedEquipId || !warehouseId) return;
     setLoading(true);
     setResult(null);
-    const res = await scanInbound(selectedEquipId, warehouseId, inspectionResult, notes);
+    const selected = equipment.find(e => e.id === selectedEquipId);
+    const res = await scanInbound(
+      selectedEquipId,
+      warehouseId,
+      selected?.current_order_id ?? undefined,
+      selected?.current_contract_id ?? undefined,
+      inspectionResult,
+      notes
+    );
     setResult({ success: res.success, message: res.success ? "入库成功！设备已归还入库。" : res.error });
     setLoading(false);
     if (res.success) {
