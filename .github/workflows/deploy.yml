@@ -42,16 +42,7 @@ jobs:
           REMOTE_USER: ${{ secrets.SSH_USER }}
           REMOTE_PORT: ${{ secrets.SSH_PORT }}
           TARGET: ${{ vars.DEPLOY_PATH || '/opt/rentops' }}
-          EXCLUDE: |
-            .git
-            .github
-            .claude
-            .idea
-            node_modules
-            .env
-            .env.*
-            logs
-            *.md
+          EXCLUDE: .git, .github, .claude, .idea, node_modules, .env, .env.*, logs, *.md
 
       # ── 2. Install, build, migrate & restart ────────────────────
       - name: Build & restart on server
