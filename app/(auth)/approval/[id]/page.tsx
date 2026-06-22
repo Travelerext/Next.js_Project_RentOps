@@ -11,13 +11,11 @@ import { ApprovalActions } from "./action-buttons";
 import {
   Clock,
   FileText,
-  Building2,
   ShoppingCart,
   FileSignature,
   Percent,
   CreditCard,
   Trash2,
-  AlertCircle,
 } from "lucide-react";
 
 // ─── Labels ───────────────────────────────────────────────────────────
@@ -210,6 +208,11 @@ export default async function ApprovalDetailPage({
               {STATUS_LABELS[approval.status] ?? approval.status}
             </Badge>
           }
+          actions={
+            canApprove && approval.status !== "APPROVED" && approval.status !== "REJECTED"
+              ? <ApprovalActions approvalId={id} />
+              : undefined
+          }
         />
 
         {/* ── 审批信息 ────────────────────────────────────────────── */}
@@ -308,19 +311,6 @@ export default async function ApprovalDetailPage({
         </Card>
 
         {/* ── 操作按钮 ────────────────────────────────────────────── */}
-        {canApprove && approval.status !== "APPROVED" && approval.status !== "REJECTED" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                操作
-              </CardTitle>
-            </CardHeader>
-            <div className="px-4 pb-4 md:px-6">
-              <ApprovalActions approvalId={id} />
-            </div>
-          </Card>
-        )}
       </div>
     </DirectionalTransition>
   );
