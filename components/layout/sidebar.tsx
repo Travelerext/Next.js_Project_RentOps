@@ -61,9 +61,6 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "对账单", href: "/finance/reconciliation", icon: FileText },
     { label: "折旧", href: "/finance/depreciation", icon: Gauge },
     { label: "设备利润", href: "/finance/equipment-profit", icon: TrendingUp },
-    { label: "客户查询", href: "/sales/customers", icon: Users },
-    { label: "订单查询", href: "/sales/orders", icon: ShoppingCart },
-    { label: "合同查询", href: "/sales/contracts", icon: FileText },
   ],
   MAINTENANCE_DASHBOARD: [
     { label: "工作台", href: "/maintenance", icon: LayoutDashboard },
