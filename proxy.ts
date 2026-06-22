@@ -26,7 +26,7 @@ const ROLE_ROUTE_MAP: Record<string, string[]> = {
   SYSTEM_ADMIN: ["/admin", "/sales", "/equipment", "/finance", "/maintenance", "/approval", "/customer"],
   SALES: ["/sales"],
   EQUIPMENT_MANAGER: ["/equipment"],
-  FINANCE: ["/finance"],
+  FINANCE: ["/finance", "/sales"],
   MAINTENANCE: ["/maintenance"],
   APPROVER: ["/approval"],
   CUSTOMER: ["/customer"],
