@@ -62,18 +62,23 @@ jobs:
             DEPLOY_PATH="/opt/rentops"
             cd "$DEPLOY_PATH"
 
-            echo "📦 Installing dependencies..."
-            npm ci
-
-            echo "🔨 Building app..."
-            npm run build
-
             echo "📝 Writing environment file..."
             cat > .env << ENVEOF
             NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
             SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
             ENVEOF
+
+            echo "🔧 Injecting env vars into PM2 config..."
+            sed -i "s|__NEXT_PUBLIC_SUPABASE_URL__|${NEXT_PUBLIC_SUPABASE_URL}|g" ecosystem.config.js
+            sed -i "s|__NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY__|${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}|g" ecosystem.config.js
+            sed -i "s|__SUPABASE_SERVICE_ROLE_KEY__|${SUPABASE_SERVICE_ROLE_KEY}|g" ecosystem.config.js
+
+            echo "📦 Installing dependencies..."
+            npm ci
+
+            echo "🔨 Building app..."
+            npm run build
 
             echo "🚀 Starting app..."
             mkdir -p logs

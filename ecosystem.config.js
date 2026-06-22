@@ -12,9 +12,13 @@ module.exports = {
       max_memory_restart: "512M",
 
       // ── Env ──────────────────────────────────────────────────────
+      // Placeholders replaced by deploy script with real values from GitHub Secrets
       env: {
         NODE_ENV: "production",
         PORT: 3000,
+        NEXT_PUBLIC_SUPABASE_URL: "__NEXT_PUBLIC_SUPABASE_URL__",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "__NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY__",
+        SUPABASE_SERVICE_ROLE_KEY: "__SUPABASE_SERVICE_ROLE_KEY__",
       },
 
       // ── Logs ─────────────────────────────────────────────────────
@@ -29,8 +33,6 @@ module.exports = {
       autorestart: true,
       max_restarts: 10,
       restart_delay: 2000,
-      wait_ready: true,
-      listen_timeout: 10000,
       kill_timeout: 5000,
     },
   ],
