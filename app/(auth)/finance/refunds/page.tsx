@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { createClient } from "@/lib/supabase/server";
 import { DataPage } from "@/components/data/data-page";
 import { DataTable, type Column } from "@/components/data/data-table";
 import { StatsGrid } from "@/components/data/stats-grid";
