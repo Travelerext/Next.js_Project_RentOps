@@ -242,17 +242,14 @@ SELECT cron.schedule(
     )
     INSERT INTO public.notification (recipient_id, notification_type, title, content, business_type, business_id)
     SELECT
-      profiles.id,
+      p.id,
       'CONTRACT_OVERDUE',
       '合同已逾期',
       '订单 ' || o.order_no || ' 已超过计划结束时间，请及时跟进归还。',
       'ORDER',
       o.id
     FROM overdue_orders o
-    JOIN public.profiles ON profiles.supabase_user_id = (
-      SELECT supabase_user_id FROM public.profiles WHERE id = o.sales_user_id
-    )
-    WHERE o.sales_user_id IS NOT NULL;
+    JOIN public.profiles p ON p.id = o.sales_user_id;
   $$
 );
 
@@ -274,7 +271,7 @@ SELECT cron.schedule(
     )
     INSERT INTO public.notification (recipient_id, notification_type, title, content, business_type, business_id)
     SELECT
-      profiles.id,
+      p.id,
       'RECEIVABLE_OVERDUE',
       '应收已逾期',
       '应收 ' || r.receivable_no || '（金额：¥' || r.unpaid_amount::TEXT || '）已逾期，请跟进收款。',
@@ -284,8 +281,8 @@ SELECT cron.schedule(
     CROSS JOIN (
       SELECT id FROM public.profiles
       WHERE primary_role IN ('FINANCE', 'FINANCE_MANAGER', 'SYSTEM_ADMIN', 'GENERAL_MANAGER')
-      LIMIT 1
-    ) profiles;
+        AND account_status = 'ACTIVE'
+    ) p;
   $$
 );
 
