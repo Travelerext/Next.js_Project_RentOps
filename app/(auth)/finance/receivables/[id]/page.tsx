@@ -72,7 +72,7 @@ export default async function ReceivableDetailPage({ params }: { params: Promise
         <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" />基本信息</CardTitle></CardHeader>
         <InfoGrid items={[
           { label: "应收编号", value: receivable.receivable_no as string },
-          { label: "客户", value: customer?.name ?? "-" },
+          { label: "客户", value: customer ? <Link href={`/sales/customers/${receivable.customer_id}`} className="text-blue-600 hover:underline">{customer.name}</Link> : "-" },
           { label: "类型", value: TYPE_LABELS[receivable.receivable_type as string] ?? String(receivable.receivable_type) },
           { label: "订单", value: order ? <Link href={`/sales/orders/${receivable.order_id}`} className="text-blue-600 hover:underline">{order.order_no}</Link> : "-" },
           { label: "合同", value: contract ? <Link href={`/sales/contracts/${receivable.contract_id}`} className="text-blue-600 hover:underline">{contract.contract_no}</Link> : "-" },

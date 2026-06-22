@@ -89,9 +89,10 @@ export function ConfirmPaymentButton({
           />
 
           <Input
-            label="付款人"
+            label="付款人 *"
             name="payerName"
-            placeholder="付款人姓名（可选）"
+            placeholder="付款人姓名"
+            required
           />
 
           <Input

@@ -11,7 +11,7 @@ import type { ActionResult } from "@/lib/action-result";
 const confirmPaymentSchema = z.object({
   amount: z.coerce.number().positive("金额必须大于0"),
   paymentMethod: z.string().default("BANK_TRANSFER"),
-  payerName: z.string().optional(),
+  payerName: z.string().min(1, "请填写付款人"),
   bankFlowNo: z.string().optional(),
 });
 
@@ -41,7 +41,7 @@ export async function confirmPayment(
   const raw = {
     amount: formData.get("amount"),
     paymentMethod: formData.get("paymentMethod") || "BANK_TRANSFER",
-    payerName: formData.get("payerName") || undefined,
+    payerName: formData.get("payerName") || "",
     bankFlowNo: formData.get("bankFlowNo") || undefined,
   };
   const parsed = confirmPaymentSchema.safeParse(raw);
