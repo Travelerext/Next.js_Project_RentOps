@@ -41,9 +41,8 @@ export function ConfirmPaymentButton({
       setFieldErrors(null);
 
       const formData = new FormData(e.currentTarget);
-      formData.set("receivableId", receivableId);
 
-      const result = await confirmPayment(formData);
+      const result = await confirmPayment(receivableId, formData);
 
       if (result.success) {
         setOpen(false);

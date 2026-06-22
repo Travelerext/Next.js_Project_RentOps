@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/select";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { RECEIVABLE_STATUS } from "@/lib/constants";
 import Link from "next/link";
+import { CreateReceivableButton } from "./create-receivable-button";
 import type { ReceivableWithCustomer } from "@/lib/db/types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────
@@ -209,7 +210,7 @@ export default async function ReceivablesPage({
           : undefined
       }
     >
-      <PageHeader title="应收账款" subtitle={`共 ${count ?? 0} 笔应收`} />
+      <PageHeader title="应收账款" subtitle={`共 ${count ?? 0} 笔应收`} actions={<CreateReceivableButton />} />
 
       {/* ── Filter form ──────────────────────────────────────────────── */}
       <form

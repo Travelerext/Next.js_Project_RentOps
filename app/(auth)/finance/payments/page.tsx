@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { DollarSign, Banknote, ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { RecordPaymentButton } from "./record-payment-button";
 
 // ─── Payment type helpers ──────────────────────────────────────────────
 
@@ -133,13 +134,16 @@ export default async function PaymentsPage({
       title="收款记录"
       subtitle={`共 ${totalCount} 条记录，合计 ${formatCurrency(totalAmount)}`}
       actions={
-        <Link
-          href="/finance"
-          className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline dark:text-blue-400"
-        >
-          <ArrowRight className="h-4 w-4" />
-          返回财务工作台
-        </Link>
+        <div className="flex items-center gap-2">
+          <RecordPaymentButton />
+          <Link
+            href="/finance"
+            className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline dark:text-blue-400"
+          >
+            <ArrowRight className="h-4 w-4" />
+            返回财务工作台
+          </Link>
+        </div>
       }
       pagination={
         totalPages > 1

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import {
   DollarSign, AlertTriangle, Banknote, TrendingUp,
-  CreditCard, RefreshCcw, ArrowRight,
+  CreditCard, RefreshCcw, ArrowRight, Percent,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -31,18 +31,20 @@ export default async function FinanceDashboardPage() {
 
   const [
     { data: allReceivables },
-    { data: recentPayments },
+    { data: monthlyPayments },
     { count: pendingRefundCount },
     { data: depositRecords },
+    { data: recentPayments },
   ] = await Promise.all([
     supabase.from("receivable").select("amount, paid_amount, unpaid_amount, status, due_date, overdue_days"),
+    supabase.from("payment_record").select("amount").gte("paid_at", monthStart),
+    supabase.from("refund_record").select("*", { count: "exact", head: true }).eq("refund_status", "PENDING_APPROVAL"),
+    supabase.from("deposit_record").select("amount, available_amount, deposit_status")
+      .in("deposit_status", ["PAID", "PARTIALLY_DEDUCTED", "REFUNDING"]),
     supabase.from("payment_record")
       .select("*, customer:customer_id(name)")
       .order("paid_at", { ascending: false })
       .limit(5),
-    supabase.from("refund_record").select("*", { count: "exact", head: true }).eq("refund_status", "PENDING_APPROVAL"),
-    supabase.from("deposit_record").select("amount, available_amount, deposit_status")
-      .in("deposit_status", ["PAID", "PARTIALLY_DEDUCTED", "REFUNDING"]),
   ]);
 
   // ── Compute aggregate values ────────────────────────────────────────
@@ -62,9 +64,12 @@ export default async function FinanceDashboardPage() {
     (s, d) => s + parseFloat((d.available_amount ?? d.amount ?? "0") as string),
     0,
   );
-  const monthlyRevenue = (recentPayments ?? [])
-    .filter((p) => new Date(p.paid_at as string) >= new Date(monthStart))
-    .reduce((s, p) => s + parseFloat(p.amount as string), 0);
+  const monthlyRevenue = (monthlyPayments ?? []).reduce(
+    (s, p) => s + parseFloat((p.amount as string) ?? "0"), 0
+  );
+  const collectionRate = totalReceivables > 0
+    ? Math.round((collectedAmount / totalReceivables) * 100)
+    : 0;
 
   // ── Aging buckets ───────────────────────────────────────────────────
 
@@ -97,6 +102,7 @@ export default async function FinanceDashboardPage() {
         <StatCard icon={AlertTriangle} label="逾期金额" value={formatCurrency(overdueAmount)} color="red" />
         <StatCard icon={CreditCard} label="押金余额" value={formatCurrency(depositBalance)} color="purple" />
         <StatCard icon={TrendingUp} label="本月营收" value={formatCurrency(monthlyRevenue)} color="emerald" />
+        <StatCard icon={Percent} label="回款率" value={`${collectionRate}%`} color={collectionRate >= 80 ? "emerald" : collectionRate >= 50 ? "amber" : "red"} />
         <StatCard icon={RefreshCcw} label="待审批退款" value={pendingRefundCount ?? 0} color="amber" href="/finance/refunds" />
         <StatCard icon={DollarSign} label="快捷操作" color="indigo">
           <div className="mt-1 flex flex-wrap gap-1">

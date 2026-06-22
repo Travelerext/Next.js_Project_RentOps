@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { DataPage } from "@/components/data/data-page";
 import { DataTable, type Column } from "@/components/data/data-table";
 import { StatsGrid } from "@/components/data/stats-grid";
@@ -6,6 +7,7 @@ import { StatCard } from "@/components/data/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { ArrowDownToLine, CheckCircle, Clock, Ban } from "lucide-react";
+import { ApproveRefundButton, RejectRefundButton, ExecuteRefundButton } from "./refund-actions";
 
 const STATUS_LABELS: Record<string, string> = {
   PENDING_APPROVAL: "待审批", APPROVED: "已批准", REJECTED: "已驳回", REFUNDED: "已退款",
@@ -26,6 +28,13 @@ const cols: Column<Record<string, unknown>>[] = [
   }},
   { id: "reason", header: "原因", cell: (r) => ((r.reason as string)?.length > 30 ? `${(r.reason as string).slice(0, 30)}...` : (r.reason as string)) ?? "-", hideOnMobile: true },
   { id: "created", header: "创建时间", cell: (r) => formatDate(r.created_at as string), hideOnMobile: true },
+  { id: "actions", header: "操作", cell: (r) => {
+    const status = r.refund_status as string;
+    const id = r.id as string;
+    if (status === "PENDING_APPROVAL") return <div className="flex gap-1"><ApproveRefundButton refundId={id} /><RejectRefundButton refundId={id} /></div>;
+    if (status === "APPROVED") return <ExecuteRefundButton refundId={id} />;
+    return null;
+  }},
 ];
 
 export default async function RefundsPage() {

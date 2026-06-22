@@ -150,3 +150,227 @@ export async function requestRefund(
   revalidatePath("/finance/deposits");
   return { success: true, data: null };
 }
+
+// ─── Create Receivable (manual) ─────────────────────────────────────
+
+const createReceivableSchema = z.object({
+  customerId: z.string().min(10, "请选择客户"),
+  receivableType: z.string().default("OTHER"),
+  amount: z.coerce.number().positive("金额必须大于0"),
+  dueDate: z.string().optional(),
+  description: z.string().optional(),
+  orderId: z.string().optional(),
+  contractId: z.string().optional(),
+});
+
+export async function createReceivable(
+  formData: FormData
+): Promise<ActionResult<null>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "未登录" };
+
+  const { data: profile } = await supabase
+    .from("profiles").select("id")
+    .eq("supabase_user_id", user.id).maybeSingle();
+  if (!profile) return { success: false, error: "用户档案不存在" };
+
+  const raw = {
+    customerId: formData.get("customerId") as string,
+    receivableType: (formData.get("receivableType") as string) || "OTHER",
+    amount: formData.get("amount"),
+    dueDate: (formData.get("dueDate") as string) || undefined,
+    description: (formData.get("description") as string) || undefined,
+    orderId: (formData.get("orderId") as string) || undefined,
+    contractId: (formData.get("contractId") as string) || undefined,
+  };
+  const parsed = createReceivableSchema.safeParse(raw);
+  if (!parsed.success) {
+    const fe = parsed.error.flatten().fieldErrors as Record<string, string[]>;
+    return { success: false, error: `参数校验失败：${Object.entries(fe)[0]?.[1]?.join(", ")}`, fieldErrors: fe };
+  }
+
+  const receivableNo = generateNo("REC");
+  const { error } = await supabase.from("receivable").insert({
+    receivable_no: receivableNo,
+    customer_id: parsed.data.customerId,
+    order_id: parsed.data.orderId ?? null,
+    contract_id: parsed.data.contractId ?? null,
+    receivable_type: parsed.data.receivableType,
+    amount: parsed.data.amount,
+    unpaid_amount: parsed.data.amount,
+    due_date: parsed.data.dueDate ?? null,
+    status: "UNPAID",
+    description: parsed.data.description ?? null,
+    created_by: profile.id,
+  });
+
+  if (error) return { success: false, error: error.message };
+
+  await supabase.from("audit_log").insert({
+    actor_id: profile.id, action: "RECEIVABLE_CREATE",
+    resource_type: "RECEIVABLE", resource_id: receivableNo,
+    detail: { amount: parsed.data.amount, type: parsed.data.receivableType },
+  });
+
+  revalidatePath("/finance/receivables");
+  return { success: true, data: null };
+}
+
+// ─── Record Payment (standalone) ────────────────────────────────────
+
+export async function recordPayment(
+  formData: FormData
+): Promise<ActionResult<null>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "未登录" };
+
+  const { data: profile } = await supabase
+    .from("profiles").select("id")
+    .eq("supabase_user_id", user.id).maybeSingle();
+  if (!profile) return { success: false, error: "用户档案不存在" };
+
+  const raw = {
+    amount: formData.get("amount"),
+    paymentMethod: (formData.get("paymentMethod") as string) || "BANK_TRANSFER",
+    paymentType: (formData.get("paymentType") as string) || "OTHER",
+    payerName: formData.get("payerName") || undefined,
+    bankFlowNo: formData.get("bankFlowNo") || undefined,
+    customerId: formData.get("customerId") as string,
+    receivableId: (formData.get("receivableId") as string) || undefined,
+    paidAt: (formData.get("paidAt") as string) || new Date().toISOString(),
+  };
+  const parsed = confirmPaymentSchema.safeParse(raw);
+  if (!parsed.success) {
+    const fe = parsed.error.flatten().fieldErrors as Record<string, string[]>;
+    return { success: false, error: `参数校验失败`, fieldErrors: fe };
+  }
+
+  if (!raw.customerId || raw.customerId.length < 10) {
+    return { success: false, error: "请选择客户" };
+  }
+
+  const paymentNo = generateNo("PAY");
+  const { error } = await supabase.from("payment_record").insert({
+    payment_no: paymentNo,
+    customer_id: raw.customerId,
+    receivable_id: raw.receivableId ?? null,
+    amount: parsed.data.amount,
+    payment_method: parsed.data.paymentMethod,
+    payment_type: raw.paymentType,
+    payer_name: parsed.data.payerName ?? null,
+    bank_flow_no: parsed.data.bankFlowNo ?? null,
+    paid_at: raw.paidAt,
+    status: "COMPLETED",
+    created_by: profile.id,
+  });
+
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/finance/payments");
+  return { success: true, data: null };
+}
+
+// ─── Refund approval / rejection / execution ────────────────────────
+
+export async function approveRefund(
+  refundId: string
+): Promise<ActionResult<null>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "未登录" };
+
+  const { data: profile } = await supabase
+    .from("profiles").select("id, primary_role")
+    .eq("supabase_user_id", user.id).maybeSingle();
+  if (!profile) return { success: false, error: "用户档案不存在" };
+
+  const role = profile.primary_role ?? "";
+  if (!["SYSTEM_ADMIN", "FINANCE_MANAGER", "GENERAL_MANAGER"].includes(role)) {
+    return { success: false, error: "无权限操作" };
+  }
+
+  const { data: refund } = await supabase
+    .from("refund_record").select("id, refund_status").eq("id", refundId).single();
+  if (!refund) return { success: false, error: "退款记录不存在" };
+  if (refund.refund_status !== "PENDING_APPROVAL") {
+    return { success: false, error: "当前状态不允许审批" };
+  }
+
+  const { error } = await supabase.from("refund_record").update({
+    refund_status: "APPROVED",
+    approved_by: profile.id,
+    approved_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq("id", refundId);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/finance/refunds");
+  return { success: true, data: null };
+}
+
+export async function rejectRefund(
+  refundId: string,
+  reason: string
+): Promise<ActionResult<null>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "未登录" };
+
+  const { data: profile } = await supabase
+    .from("profiles").select("id, primary_role")
+    .eq("supabase_user_id", user.id).maybeSingle();
+  if (!profile) return { success: false, error: "用户档案不存在" };
+
+  const role = profile.primary_role ?? "";
+  if (!["SYSTEM_ADMIN", "FINANCE_MANAGER", "GENERAL_MANAGER"].includes(role)) {
+    return { success: false, error: "无权限操作" };
+  }
+
+  const { error } = await supabase.from("refund_record").update({
+    refund_status: "REJECTED",
+    rejected_reason: reason,
+    updated_at: new Date().toISOString(),
+  }).eq("id", refundId);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/finance/refunds");
+  return { success: true, data: null };
+}
+
+export async function executeRefund(
+  refundId: string
+): Promise<ActionResult<null>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "未登录" };
+
+  const { data: profile } = await supabase
+    .from("profiles").select("id, primary_role")
+    .eq("supabase_user_id", user.id).maybeSingle();
+  if (!profile) return { success: false, error: "用户档案不存在" };
+
+  const role = profile.primary_role ?? "";
+  if (!["SYSTEM_ADMIN", "FINANCE", "FINANCE_MANAGER"].includes(role)) {
+    return { success: false, error: "无权限操作" };
+  }
+
+  const { data: refund } = await supabase
+    .from("refund_record").select("*, deposit:deposit_id(available_amount)").eq("id", refundId).single();
+  if (!refund) return { success: false, error: "退款记录不存在" };
+  if (refund.refund_status !== "APPROVED") {
+    return { success: false, error: "只有已审批的退款可执行" };
+  }
+
+  const { error } = await supabase.from("refund_record").update({
+    refund_status: "REFUNDED",
+    refunded_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  }).eq("id", refundId);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/finance/refunds");
+  revalidatePath("/finance/deposits");
+  return { success: true, data: null };
+}
