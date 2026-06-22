@@ -116,7 +116,6 @@ export async function approveRequest(
   }
 
   const currentStep = approval.current_step;
-  const flow = (approval.approval_config as { flow?: { step: number; approver_role: string }[] })?.flow ?? [];
   const totalSteps = flow.length || 1;
 
   // Record the approve action for the current step
