@@ -53,7 +53,7 @@ export async function submitForApproval(
   const { data: approvers } = await supabase
     .from("profiles")
     .select("id")
-    .in("primary_role", ["SALES_MANAGER", "GENERAL_MANAGER", "SYSTEM_ADMIN", "FINANCE_MANAGER"])
+    .in("primary_role", ["SALES_MANAGER", "GENERAL_MANAGER", "SYSTEM_ADMIN", "FINANCE_MANAGER", "APPROVER"])
     .eq("account_status", "ACTIVE");
 
   if (approvers && approvers.length > 0) {

@@ -65,9 +65,9 @@ export default async function PendingApprovalsPage() {
     const currentStep = (a.current_step as number) || 1;
     const stepConfig = flow.find((s) => s.step === currentStep);
     if (!stepConfig) return false;
-    // Map role names: MANAGER matches SALES_MANAGER, FINANCE_MANAGER, GENERAL_MANAGER
+    // Map role names: MANAGER matches all approver-capable roles
     if (stepConfig.approver_role === "MANAGER") {
-      return ["SALES_MANAGER", "FINANCE_MANAGER", "GENERAL_MANAGER"].includes(userRole);
+      return ["SALES_MANAGER", "FINANCE_MANAGER", "GENERAL_MANAGER", "APPROVER", "SYSTEM_ADMIN"].includes(userRole);
     }
     return stepConfig.approver_role === userRole;
   });
