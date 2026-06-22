@@ -95,6 +95,7 @@ export default async function SettlementPage() {
     .select(
       "*, customer:customer_id(name), contract:contract_id(contract_no, total_rent_amount), equipment:equipment_id(equipment_no, name)",
     )
+    .eq("customer_confirmed", true)
     .order("inspected_at", { ascending: false });
 
   // Fetch all settlements to determine which inspections are settled

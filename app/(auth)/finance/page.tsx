@@ -129,7 +129,11 @@ export default async function FinanceDashboardPage() {
               {agingBuckets.map((bucket) => {
                 const pct = outstandingAmount > 0 ? (bucket.amount / outstandingAmount) * 100 : 0;
                 return (
-                  <div key={bucket.label}>
+                  <Link
+                    key={bucket.label}
+                    href={`/finance/receivables?status=OVERDUE`}
+                    className="block rounded-lg p-2 -mx-2 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
+                  >
                     <div className="mb-1 flex justify-between text-sm">
                       <span className="text-zinc-600 dark:text-zinc-400">{bucket.label}</span>
                       <span className="tabular-nums font-medium">{formatCurrency(bucket.amount)}</span>
@@ -140,7 +144,7 @@ export default async function FinanceDashboardPage() {
                         style={{ width: `${Math.min(pct, 100)}%` }}
                       />
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
