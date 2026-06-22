@@ -85,7 +85,7 @@ export async function approveRequest(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, primary_role")
     .eq("supabase_user_id", user.id)
     .maybeSingle();
   if (!profile) return { success: false, error: "用户档案不存在" };
@@ -99,6 +99,20 @@ export async function approveRequest(
   if (!approval) return { success: false, error: "审批记录不存在" };
   if (approval.status !== "SUBMITTED" && approval.status !== "IN_PROGRESS") {
     return { success: false, error: "审批状态不允许此操作" };
+  }
+
+  // Role check: only users with matching role can approve
+  const flow = (approval.approval_config as { flow?: { step: number; approver_role: string }[] } | null)?.flow ?? [];
+  const currentStepConfig = flow.find((s: { step: number }) => s.step === approval.current_step);
+  const approverRole = currentStepConfig?.approver_role ?? "MANAGER";
+  const userRole = profile.primary_role ?? "";
+  const canApprove =
+    userRole === "SYSTEM_ADMIN" ||
+    (approverRole === "MANAGER" &&
+      ["SALES_MANAGER", "FINANCE_MANAGER", "GENERAL_MANAGER", "APPROVER"].includes(userRole)) ||
+    approverRole === userRole;
+  if (!canApprove) {
+    return { success: false, error: "您没有权限审批此申请" };
   }
 
   const currentStep = approval.current_step;

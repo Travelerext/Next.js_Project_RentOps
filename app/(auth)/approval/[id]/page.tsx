@@ -118,14 +118,15 @@ export default async function ApprovalDetailPage({
     data: { user },
   } = await supabase.auth.getUser();
 
-  let currentProfileId = "";
+  // Get current user's role for approver check
+  let currentUserRole = "";
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("id")
+      .select("primary_role")
       .eq("supabase_user_id", user.id)
       .maybeSingle();
-    currentProfileId = profile?.id ?? "";
+    currentUserRole = profile?.primary_role ?? "";
   }
 
   // ── Approval request ───────────────────────────────────────────────
@@ -152,16 +153,17 @@ export default async function ApprovalDetailPage({
 
   const steps = (rawSteps ?? []) as unknown as StepRecord[];
 
-  // ── Approver check ────────────────────────────────────────────────
+  // ── Approver check: match current user's role against the flow config ─
+  const flow = (approval.approval_config as { flow?: { step: number; approver_role: string }[] } | null)?.flow ?? [];
+  const currentStepConfig = flow.find((s) => s.step === approval.current_step);
+  const approverRole = currentStepConfig?.approver_role ?? "MANAGER";
 
-  const isCurrentApprover =
-    currentProfileId !== "" &&
-    steps.some(
-      (s) =>
-        s.step === approval.current_step &&
-        s.approver_id === currentProfileId &&
-        s.action === null
-    );
+  // MANAGER maps to any manager-type role
+  const canApprove =
+    currentUserRole === "SYSTEM_ADMIN" ||
+    (approverRole === "MANAGER" &&
+      ["SALES_MANAGER", "FINANCE_MANAGER", "GENERAL_MANAGER", "APPROVER"].includes(currentUserRole)) ||
+    approverRole === currentUserRole;
 
   // ── Business info ─────────────────────────────────────────────────
 
@@ -241,7 +243,11 @@ export default async function ApprovalDetailPage({
               </CardTitle>
             </CardHeader>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm px-4 pb-4 md:px-6">
-              <div><span className="text-zinc-500">订单编号</span><p className="font-mono font-medium">{orderInfo.order_no as string}</p></div>
+              <div><span className="text-zinc-500">订单编号</span><p className="font-mono font-medium">
+                <Link href={`/sales/orders/${bId}`} className="text-blue-600 hover:underline dark:text-blue-400">
+                  {orderInfo.order_no as string}
+                </Link>
+              </p></div>
               <div><span className="text-zinc-500">客户</span><p>{(orderInfo.customer as {name?: string})?.name ?? "-"}</p></div>
               <div><span className="text-zinc-500">计费方式</span><p>{PRICING_LABELS[orderInfo.pricing_mode as string] ?? String(orderInfo.pricing_mode)}</p></div>
               <div><span className="text-zinc-500">计划租期</span><p>{orderInfo.planned_start_at ? `${formatDate(orderInfo.planned_start_at as string)} ~ ${formatDate(orderInfo.planned_end_at as string)}` : "-"}</p></div>
@@ -302,7 +308,7 @@ export default async function ApprovalDetailPage({
         </Card>
 
         {/* ── 操作按钮 ────────────────────────────────────────────── */}
-        {isCurrentApprover && (
+        {canApprove && approval.status !== "APPROVED" && approval.status !== "REJECTED" && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
