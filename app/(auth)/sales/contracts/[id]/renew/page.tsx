@@ -80,7 +80,7 @@ export default function RenewContractPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title="续租" subtitle={contract?.contract_no} backUrl={"/sales/contracts/" + id}
+      <PageHeader title="续租" subtitle={contract?.contract_no} backUrl="_back"
         status={contract?.contract_status === "ACTIVE" ? <Badge variant="success">可续租</Badge> : <Badge variant="warning">需检查</Badge>} />
       {contract?.contract_status !== "ACTIVE" && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400 flex items-start gap-2">

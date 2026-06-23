@@ -22,6 +22,13 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
   const { id } = await params;
   const supabase = await createClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+  let isFinance = false;
+  if (user) {
+    const { data: p } = await supabase.from("profiles").select("primary_role").eq("supabase_user_id", user.id).maybeSingle();
+    isFinance = p?.primary_role === "FINANCE" || p?.primary_role === "FINANCE_MANAGER";
+  }
+
   // Fetch the contract first — bail early if not found
   const { data: contract, error } = await supabase
     .from("rental_contract")
@@ -77,9 +84,9 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
       <div className="space-y-6">
         <PageHeader
           title={contract.contract_no as string}
-          backUrl="/sales/contracts"
+          backUrl="_back"
           status={<Badge variant={status === "ACTIVE" ? "success" : status === "SIGNED" ? "info" : "default"}>{CONTRACT_STATUS[status] ?? status}</Badge>}
-          actions={<ContractActions contractId={contract.id as string} status={status} customerId={contract.customer?.id as string ?? ""} />}
+          actions={isFinance ? undefined : <ContractActions contractId={contract.id as string} status={status} customerId={contract.customer?.id as string ?? ""} />}
         />
 
         {/* Contract Document Preview */}

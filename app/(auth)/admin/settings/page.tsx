@@ -13,7 +13,7 @@ export default async function AdminSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="系统配置" subtitle="系统参数与全局设置" backUrl="/admin" />
+      <PageHeader title="系统配置" subtitle="系统参数与全局设置" backUrl="_back" />
       <Card><CardHeader><CardTitle className="flex items-center gap-2"><Server className="h-5 w-5" />系统信息</CardTitle></CardHeader>
         <div className="px-4 md:px-6 pb-4"><InfoGrid items={[{label:"应用名称",value:"机械设备租赁管理系统 (RentOps)"},{label:"版本",value:"v0.1.0"},{label:"框架",value:"Next.js 16 + TypeScript"},{label:"数据库",value:"Supabase PostgreSQL"},{label:"UI",value:"Tailwind CSS + shadcn/ui"},{label:"认证",value:"Supabase Auth"},{label:"部署",value:"Vercel + Supabase Cloud"}]} /></div>
       </Card>

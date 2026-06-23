@@ -154,7 +154,7 @@ export default async function AdminAuditLogPage({
       <PageHeader
         title="审计日志"
         subtitle="系统操作审计记录（仅查看）"
-        backUrl="/admin"
+        backUrl="_back"
       />
 
       {/* ── Filters ──────────────────────────────────────────────── */}

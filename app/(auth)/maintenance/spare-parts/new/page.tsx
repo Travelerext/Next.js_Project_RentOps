@@ -123,7 +123,7 @@ export default function NewSparePartPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title="添加配件" subtitle="录入新的配件库存信息" backUrl="/maintenance/spare-parts" />
+      <PageHeader title="添加配件" subtitle="录入新的配件库存信息" backUrl="_back" />
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Boxes className="h-5 w-5" />配件信息</CardTitle></CardHeader>

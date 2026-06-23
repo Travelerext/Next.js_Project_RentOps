@@ -13,9 +13,10 @@ interface Props {
   inspectionId: string;
   hasRefund: boolean;
   hasCharge: boolean;
+  customerId?: string;
 }
 
-export function SettlementConfirmButton({ inspectionId, hasRefund, hasCharge }: Props) {
+export function SettlementConfirmButton({ inspectionId, hasRefund, hasCharge, customerId }: Props) {
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +94,7 @@ export function SettlementConfirmButton({ inspectionId, hasRefund, hasCharge }: 
               </div>
               <div className="flex gap-3">
                 {hasRefund && <Link href="/finance/refunds" className="text-blue-600 hover:underline font-medium">查看退款 →</Link>}
-                {hasCharge && <Link href="/finance/receivables" className="text-blue-600 hover:underline font-medium">查看应收 →</Link>}
+                {hasCharge && <Link href={`/finance/receivables?customerId=${customerId ?? ""}&status=UNPAID`} className="text-blue-600 hover:underline font-medium">查看应收 →</Link>}
               </div>
             </div>
           )}

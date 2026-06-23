@@ -24,8 +24,13 @@ const TYPE_LABELS: Record<string, string> = {
   LATE_FEE: "滞纳金", PENALTY: "违约金", OTHER: "其他",
 };
 
-export default async function ReceivableDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ReceivableDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ customerId?: string; status?: string }> }) {
   const { id } = await params;
+  const sp = await searchParams;
+  const backQuery = new URLSearchParams();
+  if (sp.customerId) backQuery.set("customerId", sp.customerId);
+  if (sp.status) backQuery.set("status", sp.status);
+  const backUrl = `/finance/receivables${backQuery.toString() ? `?${backQuery.toString()}` : ""}`;
   const supabase = await createClient();
 
   const { data: raw } = await supabase
@@ -60,10 +65,10 @@ export default async function ReceivableDetailPage({ params }: { params: Promise
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader backUrl="_back"
         title={`应收详情`}
         subtitle={`${receivable.receivable_no} · ${customer?.name ?? "-"}`}
-        backUrl="/finance/receivables"
+        backUrl="_back"
         status={<Badge variant={STATUS_VARIANTS[receivable.status as string] ?? "default"}>{STATUS_LABELS[receivable.status as string] ?? String(receivable.status)}</Badge>}
         actions={canPay ? <ConfirmPaymentButton receivableId={id} receivableNo={receivable.receivable_no as string} unpaidAmount={String(unpaid)} /> : undefined}
       />
@@ -72,10 +77,10 @@ export default async function ReceivableDetailPage({ params }: { params: Promise
         <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" />基本信息</CardTitle></CardHeader>
         <InfoGrid items={[
           { label: "应收编号", value: receivable.receivable_no as string },
-          { label: "客户", value: customer ? <Link href={`/sales/customers/${receivable.customer_id}`} className="text-blue-600 hover:underline">{customer.name}</Link> : "-" },
+          { label: "客户", value: customer ? <Link href={`/sales/customers/${receivable.customer_id}?from=finance`} className="text-blue-600 hover:underline">{customer.name}</Link> : "-" },
           { label: "类型", value: TYPE_LABELS[receivable.receivable_type as string] ?? String(receivable.receivable_type) },
-          { label: "订单", value: order ? <Link href={`/sales/orders/${receivable.order_id}`} className="text-blue-600 hover:underline">{order.order_no}</Link> : "-" },
-          { label: "合同", value: contract ? <Link href={`/sales/contracts/${receivable.contract_id}`} className="text-blue-600 hover:underline">{contract.contract_no}</Link> : "-" },
+          { label: "订单", value: order ? <Link href={`/sales/orders/${receivable.order_id}?from=finance`} className="text-blue-600 hover:underline">{order.order_no}</Link> : "-" },
+          { label: "合同", value: contract ? <Link href={`/sales/contracts/${receivable.contract_id}?from=finance`} className="text-blue-600 hover:underline">{contract.contract_no}</Link> : "-" },
           { label: "到期日", value: (receivable.due_date as string) ? new Date(receivable.due_date as string).toLocaleDateString("zh-CN") : "-" },
           { label: "逾期天数", value: ((receivable.overdue_days as number) ?? 0) > 0 ? <span className="text-red-600 font-medium">{String(receivable.overdue_days)} 天</span> : "-" },
         ]} />

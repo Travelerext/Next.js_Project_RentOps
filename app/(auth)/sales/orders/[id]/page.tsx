@@ -14,7 +14,6 @@ import { SubmitOrderButton } from "./submit-button";
 import { CreateContractButton } from "./create-contract-button";
 import { DeleteDraftButton } from "./delete-draft-button";
 import { CancelOrderButton } from "./cancel-order-button";
-import { RequestReturnButton } from "./request-return-button";
 
 type OrderItem = {
   id: string; quantity: number; actual_unit_price: string | number;
@@ -43,6 +42,14 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const { id } = await params;
   const supabase = await createClient();
 
+  // Check if current user is finance
+  const { data: { user } } = await supabase.auth.getUser();
+  let isFinance = false;
+  if (user) {
+    const { data: p } = await supabase.from("profiles").select("primary_role").eq("supabase_user_id", user.id).maybeSingle();
+    isFinance = p?.primary_role === "FINANCE" || p?.primary_role === "FINANCE_MANAGER";
+  }
+
   const [orderResult, itemsResult, contractResult] = await Promise.all([
     supabase.from("rental_order").select("*, customer:customer_id(id, name, customer_no, contact_name, contact_phone)").eq("id", id).single(),
     supabase.from("rental_order_item").select("*, equipment:equipment_id(equipment_no, name, brand)").eq("order_id", id),
@@ -67,9 +74,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
       <div className="space-y-6">
         <PageHeader
           title={order.order_no}
-          backUrl="/sales/orders"
+          backUrl="_back"
           status={<Badge variant={order.order_status === "OVERDUE" ? "danger" : order.order_status === "IN_PROGRESS" ? "success" : "default"}>{ORDER_STATUS[order.order_status] ?? order.order_status}</Badge>}
-          actions={
+          actions={isFinance ? undefined : (
             <div className="flex gap-2">
               {order.order_status === "DRAFT" && (
                 <>
@@ -82,11 +89,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               )}
               {["APPROVED", "CONFIRMED"].includes(order.order_status) && !contract ? <CreateContractButton orderId={order.id} /> : null}
               {contract ? <Link href={`/sales/contracts/${contract.id}`}><Button variant="outline">查看合同</Button></Link> : null}
-              {["IN_PROGRESS", "PARTIAL_RETURN", "OVERDUE"].includes(order.order_status) && (
-                <RequestReturnButton orderId={order.id} customerId={order.customer?.id ?? ""} />
-              )}
             </div>
-          }
+          )}
         />
 
         <Card>

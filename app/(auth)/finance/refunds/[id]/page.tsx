@@ -55,10 +55,10 @@ export default async function RefundDetailPage({ params }: { params: Promise<{ i
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader backUrl="_back"
         title="退款详情"
         subtitle={`${refund.refund_no} · ${customer?.name ?? "-"}`}
-        backUrl="/finance/refunds"
+        
         status={<Badge variant={STATUS_VARIANTS[status] ?? "default"}>{STATUS_LABELS[status] ?? status}</Badge>}
         actions={
           <div className="flex gap-2">

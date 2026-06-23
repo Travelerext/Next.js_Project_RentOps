@@ -32,7 +32,7 @@ export default function NewCustomerPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title="新建客户" subtitle="创建新的客户档案" backUrl="/sales/customers" />
+      <PageHeader title="新建客户" subtitle="创建新的客户档案" backUrl="_back" />
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><UserPlus className="h-5 w-5" />客户信息</CardTitle></CardHeader>

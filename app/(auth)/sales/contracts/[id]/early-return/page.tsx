@@ -272,7 +272,7 @@ export default function EarlyReturnPage() {
       <PageHeader
         title="提前归还"
         subtitle={contract.contract_no}
-        backUrl={`/sales/contracts/${id}`}
+        backUrl="_back"
         status={
           contract.contract_status === "ACTIVE" ? (
             <Badge variant="success">履行中</Badge>

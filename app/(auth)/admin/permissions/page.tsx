@@ -84,7 +84,7 @@ export default async function AdminPermissionsPage() {
       <PageHeader
         title="权限管理"
         subtitle={`共 ${permissions.length} 项权限 · ${moduleKeys.length} 个模块`}
-        backUrl="/admin"
+        backUrl="_back"
       />
 
       {permissions.length === 0 ? (

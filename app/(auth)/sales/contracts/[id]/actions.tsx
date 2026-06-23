@@ -85,7 +85,7 @@ export function ContractActions({ contractId, status, customerId }: { contractId
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {/* Status-based action buttons */}
       {status === "DRAFT" && (
         <Button variant="primary" size="sm" onClick={handleSubmit} disabled={loading === "submit"}>

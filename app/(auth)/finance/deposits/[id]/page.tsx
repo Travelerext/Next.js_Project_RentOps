@@ -58,10 +58,10 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
-      <PageHeader
+      <PageHeader backUrl="_back"
         title="押金详情"
         subtitle={`${deposit.deposit_no} · ${customer?.name ?? "-"}`}
-        backUrl="/finance/deposits"
+        
         status={<Badge variant={STATUS_VARIANTS[status] ?? "default"}>{STATUS_LABELS[status] ?? status}</Badge>}
       />
 

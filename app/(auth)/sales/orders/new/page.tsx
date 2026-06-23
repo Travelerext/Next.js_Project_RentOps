@@ -41,7 +41,6 @@ interface SelectedEquipment {
   pricingMode: string;
   unitPrice: number;
   depositAmount: number;
-  quantity: number;
   /** Original monthly standard price (captured at selection time) */
   standardRent: number;
   /** Original standard deposit (captured at selection time) */
@@ -180,13 +179,13 @@ export default function NewOrderPage() {
     for (const item of selectedEquipment) {
       let rent = 0;
       switch (pricingMode) {
-        case "HOURLY": rent = item.unitPrice * Math.ceil(totalHours) * item.quantity; break;
-        case "DAILY": rent = item.unitPrice * days * item.quantity; break;
-        case "MONTHLY": rent = item.unitPrice * Math.max(1, Math.ceil(days / 30)) * item.quantity; break;
-        default: rent = item.unitPrice * Math.max(1, Math.ceil(days / 30)) * item.quantity;
+        case "HOURLY": rent = item.unitPrice * Math.ceil(totalHours); break;
+        case "DAILY": rent = item.unitPrice * days; break;
+        case "MONTHLY": rent = item.unitPrice * Math.max(1, Math.ceil(days / 30)); break;
+        default: rent = item.unitPrice * Math.max(1, Math.ceil(days / 30));
       }
       rent = Math.round(rent * 100) / 100;
-      const dep = Math.round(item.depositAmount * item.quantity * 100) / 100;
+      const dep = Math.round(item.depositAmount * 100) / 100;
       results[item.equipmentId] = {
         rentAmount: rent,
         depositAmount: dep,
@@ -208,7 +207,6 @@ export default function NewOrderPage() {
       pricingMode,
       unitPrice: parseFloat(equip.standard_rent ?? "0"),
       depositAmount: parseFloat(equip.standard_deposit ?? "0"),
-      quantity: 1,
       standardRent: parseFloat(equip.standard_rent ?? "0"),
       standardDeposit: parseFloat(equip.standard_deposit ?? "0"),
     }]);
@@ -251,7 +249,6 @@ export default function NewOrderPage() {
       ifd.set("pricingMode", item.pricingMode);
       ifd.set("unitPrice", String(item.unitPrice));
       ifd.set("depositAmount", String(item.depositAmount));
-      ifd.set("quantity", String(item.quantity));
       if (plannedStartAt) ifd.set("startAt", new Date(plannedStartAt).toISOString());
       if (plannedEndAt) ifd.set("endAt", new Date(plannedEndAt).toISOString());
       const itemResult = await addOrderItem(result.data.id, ifd);
@@ -330,7 +327,7 @@ export default function NewOrderPage() {
       <PageHeader
         title="快速开单"
         subtitle={["选择客户", "选择设备", "租金计算", "改价", "确认提交"][["customer","equipment","pricing","adjust","review"].indexOf(step)]}
-        backUrl="/sales/orders"
+        backUrl="_back"
       />
 
       {/* Step indicator */}
@@ -463,7 +460,7 @@ export default function NewOrderPage() {
               <CardHeader><CardTitle>已选设备 ({selectedEquipment.length})</CardTitle></CardHeader>
               <div>
                 <table className="w-full text-sm">
-                  <thead><tr className="border-b"><th className="p-2 text-left">编号</th><th className="p-2 text-left">名称</th><th className="p-2 text-right">单价</th><th className="p-2 text-right">押金</th><th className="p-2 text-center">数量</th><th className="p-2"></th></tr></thead>
+                  <thead><tr className="border-b"><th className="p-2 text-left">编号</th><th className="p-2 text-left">名称</th><th className="p-2 text-right">单价</th><th className="p-2 text-right">押金</th><th className="p-2"></th></tr></thead>
                   <tbody>
                     {selectedEquipment.map(item => (
                       <tr key={item.equipmentId} className="border-b">
@@ -471,7 +468,6 @@ export default function NewOrderPage() {
                         <td className="p-2">{item.name}{item.brand ? ` (${item.brand})` : ""}</td>
                         <td className="p-2"><Input type="number" value={item.unitPrice} onChange={e => updateEquipmentField(item.equipmentId, "unitPrice", parseFloat(e.target.value) || 0)} className="w-24 text-right" /></td>
                         <td className="p-2"><Input type="number" value={item.depositAmount} onChange={e => updateEquipmentField(item.equipmentId, "depositAmount", parseFloat(e.target.value) || 0)} className="w-24 text-right" /></td>
-                        <td className="p-2 text-center"><Input type="number" value={item.quantity} onChange={e => updateEquipmentField(item.equipmentId, "quantity", parseFloat(e.target.value) || 1)} className="w-16 text-center" min="1" /></td>
                         <td className="p-2"><Button variant="ghost" size="sm" onClick={() => removeEquipment(item.equipmentId)}><Trash2 className="h-3 w-3 text-red-500" /></Button></td>
                       </tr>
                     ))}

@@ -105,7 +105,7 @@ export default async function StockMovementsPage() {
 
   return (
     <DataPage title="" empty={false}>
-      <PageHeader title="库存流水" backUrl="/maintenance/spare-parts" />
+      <PageHeader title="库存流水" backUrl="_back" />
       <DataTable
         columns={cols}
         data={(data ?? []) as Record<string, unknown>[]}

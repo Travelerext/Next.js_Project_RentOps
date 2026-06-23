@@ -94,7 +94,7 @@ export default function NewMaintenancePlanPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title="新建保养计划" subtitle="创建定期保养计划，系统将根据周期自动计算下次保养日期" backUrl="/maintenance/plans" />
+      <PageHeader title="新建保养计划" subtitle="创建定期保养计划，系统将根据周期自动计算下次保养日期" backUrl="_back" />
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5" />计划信息</CardTitle></CardHeader>

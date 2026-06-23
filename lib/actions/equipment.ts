@@ -47,6 +47,10 @@ export async function createEquipment(
     return { success: false, error: "请选择设备分类", fieldErrors: { categoryId: ["分类ID无效"] } };
   }
 
+  if (!formData) {
+    return { success: false, error: "缺少表单数据" };
+  }
+
   const raw = {
     name: (formData.get("name") as string)?.trim() || "",
     modelId: (formData.get("modelId") as string) || undefined,

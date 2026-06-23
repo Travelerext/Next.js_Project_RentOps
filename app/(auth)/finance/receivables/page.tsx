@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { DataPage } from "@/components/data/data-page";
 import { DataTable, type Column } from "@/components/data/data-table";
-import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -201,7 +200,7 @@ export default async function ReceivablesPage({
   return (
     <DataPage
       title="应收账款"
-      subtitle="管理所有应收款项，跟踪收款进度"
+      subtitle={`共 ${count ?? 0} 笔应收 · 管理所有应收款项`}
       empty={false}
       pagination={
         totalPages > 1
@@ -209,7 +208,6 @@ export default async function ReceivablesPage({
           : undefined
       }
     >
-      <PageHeader title="应收账款" subtitle={`共 ${count ?? 0} 笔应收`} />
 
       {/* ── Filter form ──────────────────────────────────────────────── */}
       <form
@@ -237,7 +235,7 @@ export default async function ReceivablesPage({
         columns={columns}
         data={receivables}
         keyExtractor={(r) => r.id}
-        rowHref={(r) => `/finance/receivables/${r.id}`}
+        rowHref={(r) => `/finance/receivables/${r.id}${paginationQuery ? `?${paginationQuery}` : ""}`}
         emptyMessage={hasFilters ? "未找到匹配结果，请调整筛选条件" : "暂无应收记录"}
         rowClassName={(r) =>
           r.status === "OVERDUE" || (r.overdue_days ?? 0) > 0

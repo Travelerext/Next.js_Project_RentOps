@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/layout/page-header";
 import { Search, ArrowDownToLine, CheckCircle, XCircle } from "lucide-react";
 
-interface EquipmentOption { id: string; equipment_no: string; name: string; status: string; current_order_id: string | null; current_contract_id: string | null; }
+interface EquipmentOption { id: string; equipment_no: string; name: string; status: string; current_order_id: string | null; current_contract_id: string | null; current_customer_id: string | null; }
 interface WarehouseOption { id: string; name: string; }
 interface ReturnRequestItem {
   id: string; request_no: string; reason: string | null;
@@ -31,6 +31,8 @@ export default function ScanInboundPage() {
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
   const [equipSearch, setEquipSearch] = useState("");
   const [selectedEquipId, setSelectedEquipId] = useState("");
+  const [selectedOrderId, setSelectedOrderId] = useState("");
+  const [selectedContractId, setSelectedContractId] = useState("");
   const [warehouseId, setWarehouseId] = useState("");
   const [inspectionResult, setInspectionResult] = useState("NORMAL");
   const [notes, setNotes] = useState("");
@@ -51,8 +53,8 @@ export default function ScanInboundPage() {
   }, []);
 
   const searchEquipment = useCallback(async () => {
-    let q = supabase.from("equipment").select("id, equipment_no, name, status, current_order_id, current_contract_id")
-      .in("status", ["RENTED", "PENDING_INSPECTION"]).eq("scrapped", false).order("equipment_no").limit(30);
+    let q = supabase.from("equipment").select("id, equipment_no, name, status, current_order_id, current_contract_id, current_customer_id")
+      .in("status", ["RENTED", "PENDING_INSPECTION", "PENDING_OUTBOUND"]).eq("scrapped", false).order("equipment_no").limit(30);
     if (orderId) q = q.eq("current_order_id", orderId);
     if (contractId) q = q.eq("current_contract_id", contractId);
     if (equipSearch) q = q.or(`name.ilike.%${equipSearch}%,equipment_no.ilike.%${equipSearch}%`);
@@ -71,22 +73,24 @@ export default function ScanInboundPage() {
     const res = await scanInbound(
       selectedEquipId,
       warehouseId,
-      selected?.current_order_id ?? undefined,
-      selected?.current_contract_id ?? undefined,
+      selectedOrderId || undefined,
+      selectedContractId || undefined,
+      selected?.current_customer_id ?? undefined,
       inspectionResult,
       notes
     );
     setResult({ success: res.success, message: res.success ? "入库成功！设备已归还入库。" : res.error });
     setLoading(false);
     if (res.success) {
-      setSelectedEquipId(""); setEquipSearch(""); setNotes("");
+      setSelectedEquipId(""); setSelectedOrderId(""); setSelectedContractId("");
+      setEquipSearch(""); setNotes("");
       searchEquipment();
     }
   }
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title="归还入库" subtitle="扫描或选择出租中设备，完成归还验收" backUrl="/equipment" />
+      <PageHeader title="归还入库" subtitle="扫描或选择出租中设备，完成归还验收" backUrl="_back" />
 
       {/* Pending return requests */}
       {returnRequests.length > 0 && (
@@ -131,7 +135,12 @@ export default function ScanInboundPage() {
             {equipment.length > 0 && (
               <div className="max-h-48 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
                 {equipment.map(e => (
-                  <button key={e.id} type="button" onClick={() => { setSelectedEquipId(e.id); setEquipSearch(`${e.equipment_no} - ${e.name}`); }}
+                  <button key={e.id} type="button" onClick={() => {
+                    setSelectedEquipId(e.id);
+                    setEquipSearch(`${e.equipment_no} - ${e.name}`);
+                    setSelectedOrderId(e.current_order_id ?? "");
+                    setSelectedContractId(e.current_contract_id ?? "");
+                  }}
                     className={`w-full text-left px-3 py-2 text-sm border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${
                       selectedEquipId === e.id ? "bg-blue-50 dark:bg-blue-900/20" : ""}`}>
                     <span className="font-mono text-xs">{e.equipment_no}</span>
@@ -145,6 +154,13 @@ export default function ScanInboundPage() {
 
           <Select id="warehouseId" label="入库仓库 *" value={warehouseId} onChange={e => setWarehouseId(e.target.value)}
             options={[{ value: "", label: "请选择仓库" }, ...warehouses.map(w => ({ value: w.id, label: w.name }))]} />
+
+          {selectedOrderId && (
+            <div className="text-sm text-zinc-600 dark:text-zinc-400">
+              关联订单：<span className="font-mono text-blue-600">{selectedOrderId.slice(0, 8)}...</span>
+              {selectedContractId && <span className="ml-3">合同：<span className="font-mono text-blue-600">{selectedContractId.slice(0, 8)}...</span></span>}
+            </div>
+          )}
 
           <Select id="inspectionResult" label="验收结果 *" value={inspectionResult} onChange={e => setInspectionResult(e.target.value)}
             options={[

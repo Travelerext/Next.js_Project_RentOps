@@ -86,7 +86,7 @@ export default function NewWorkOrderPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title="新建维修工单" subtitle="设备故障报修登记" backUrl="/maintenance/work-orders" />
+      <PageHeader title="新建维修工单" subtitle="设备故障报修登记" backUrl="_back" />
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Wrench className="h-5 w-5" />报修信息</CardTitle></CardHeader>

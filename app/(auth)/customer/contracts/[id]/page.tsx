@@ -74,7 +74,7 @@ export default async function CustomerContractDetailPage({ params }: { params: P
       <div className="space-y-6">
         <PageHeader
           title={contract.contract_no as string}
-          backUrl="/customer/contracts"
+          backUrl="_back"
           status={<Badge variant={status === "ACTIVE" ? "success" : status === "SIGNED" ? "info" : "default"}>{CONTRACT_STATUS[status] ?? status}</Badge>}
         />
 

@@ -13,8 +13,8 @@ import { SettlementConfirmButton } from "./confirm-button";
 interface InspectionFull {
   id: string;
   inspection_no: string;
-  order_id: string;
-  contract_id: string;
+  order_id: string | null;
+  contract_id: string | null;
   inspected_at: string;
   is_overdue: boolean;
   overdue_days: number | null;
@@ -75,6 +75,7 @@ interface SettlementPreview {
   depositBalance: number;
   refundAmount: number;
   additionalCharge: number;
+  overpaidRent: number;
 }
 
 async function calculatePreview(
@@ -83,17 +84,44 @@ async function calculatePreview(
 ): Promise<SettlementPreview> {
   const contract = inspection.contract;
 
-  // Unpaid rent from receivables
-  const { data: receivables } = await supabase
+  // All receivables for this contract (including PAID ones — for early return refund)
+  const { data: allReceivables } = await supabase
     .from("receivable")
-    .select("unpaid_amount")
-    .eq("contract_id", inspection.contract_id)
-    .in("status", ["UNPAID", "PARTIAL", "OVERDUE"]);
+    .select("amount, paid_amount, unpaid_amount, status")
+    .eq("contract_id", inspection.contract_id);
 
-  const unpaidRent = (receivables ?? []).reduce(
-    (s, r) => s + parseFloat(r.unpaid_amount as string),
-    0,
-  );
+  // Unpaid rent
+  const unpaidRent = (allReceivables ?? [])
+    .filter(r => ["UNPAID", "PARTIAL", "OVERDUE"].includes(r.status as string))
+    .reduce((s, r) => s + parseFloat(r.unpaid_amount as string), 0);
+
+  // Early return: calculate overpaid rent that should be refunded
+  // Total paid across ALL receivables vs prorated rent owed
+  const totalPaid = (allReceivables ?? []).reduce((s, r) => s + parseFloat(r.paid_amount as string), 0);
+  const totalReceivableAmount = (allReceivables ?? []).reduce((s, r) => s + parseFloat(r.amount as string), 0);
+
+  // Calculate prorated rent for actual usage period
+  const contractTotalRent = contract ? parseFloat(contract.total_rent_amount) : 0;
+  let proratedRentOwed = contractTotalRent;
+  if (inspection.contract_id && contractTotalRent > 0) {
+    const { data: order } = await supabase
+      .from("rental_order").select("planned_start_at, planned_end_at, actual_start_at")
+      .eq("id", inspection.order_id).maybeSingle();
+    if (order?.planned_start_at && order?.planned_end_at) {
+      const plannedStart = new Date(order.planned_start_at as string).getTime();
+      const plannedEnd = new Date(order.planned_end_at as string).getTime();
+      const plannedDays = Math.max(1, Math.ceil((plannedEnd - plannedStart) / (1000 * 60 * 60 * 24)));
+      const actualEnd = new Date(inspection.inspected_at).getTime();
+      const actualStart = order.actual_start_at
+        ? new Date(order.actual_start_at as string).getTime()
+        : plannedStart;
+      const actualDays = Math.max(1, Math.ceil((actualEnd - actualStart) / (1000 * 60 * 60 * 24)));
+      proratedRentOwed = contractTotalRent * (actualDays / plannedDays);
+    }
+  }
+
+  // Overpaid rent (early return refund)
+  const overpaidRent = Math.max(0, totalPaid - proratedRentOwed);
 
   // Overdue rent
   const dailyRent =
@@ -130,6 +158,9 @@ async function calculatePreview(
     unpaidRent + overdueRent + lateFee + penalty +
     damageCompensation + missingPartsComp + cleaningFee + repairFee;
 
+  // Net: deductions minus overpaid rent credit
+  const netDeduction = Math.max(0, totalDeduction - overpaidRent);
+
   // Deposit balance
   const { data: deposit } = await supabase
     .from("deposit_record")
@@ -141,18 +172,20 @@ async function calculatePreview(
     ? parseFloat(deposit.available_amount as string)
     : (contract ? parseFloat(contract.deposit_amount) : 0);
 
-  const refundAmount = depositBalance > totalDeduction
-    ? depositBalance - totalDeduction
+  const totalAvailable = depositBalance + overpaidRent;
+  const refundAmount = totalAvailable > netDeduction
+    ? totalAvailable - netDeduction
     : 0;
-  const additionalCharge = totalDeduction > depositBalance
-    ? totalDeduction - depositBalance
+  const additionalCharge = netDeduction > totalAvailable
+    ? netDeduction - totalAvailable
     : 0;
 
   return {
     unpaidRent, overdueRent, lateFee, lateFeeDesc,
     penalty, penaltyDesc,
     damageCompensation, missingPartsComp, cleaningFee, repairFee,
-    totalDeduction, depositBalance, refundAmount, additionalCharge,
+    totalDeduction: netDeduction, depositBalance, refundAmount, additionalCharge,
+    overpaidRent,
   };
 }
 
@@ -170,10 +203,12 @@ const SETTLEMENT_LINES = (
   { label: "缺件赔偿", amount: p.missingPartsComp, note: inspection.missing_parts_desc ?? "-" },
   { label: "清洁费", amount: p.cleaningFee, note: inspection.is_dirty ? "设备污损需清洁" : "无" },
   { label: "维修费", amount: p.repairFee, note: inspection.needs_repair ? `预估 ${formatCurrency(inspection.repair_estimate ?? 0)}` : "无需维修" },
+  { label: "多付租金退还", amount: -p.overpaidRent, note: p.overpaidRent > 0 ? "提前退租多付的租金退还客户" : "无", highlight: p.overpaidRent > 0 },
   { label: "扣款合计", amount: p.totalDeduction, note: "", highlight: true },
   { label: "押金余额", amount: p.depositBalance, note: "可用押金余额" },
-  { label: "应退金额", amount: p.refundAmount, note: "扣款后余额退还客户", highlight: p.refundAmount > 0 },
-  { label: "应补金额", amount: p.additionalCharge, note: "扣款超出押金，客户需补缴", highlight: p.additionalCharge > 0 },
+  { label: "多付租金", amount: p.overpaidRent, note: p.overpaidRent > 0 ? "提前退租可退租金" : "无" },
+  { label: "应退金额", amount: p.refundAmount, note: "扣除费用后退还客户", highlight: p.refundAmount > 0 },
+  { label: "应补金额", amount: p.additionalCharge, note: "费用超出押金，客户需补缴", highlight: p.additionalCharge > 0 },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -248,9 +283,9 @@ export default async function SettlementDetailPage({
   return (
     <DirectionalTransition>
       <div className="space-y-6">
-        <PageHeader
+        <PageHeader backUrl="_back"
           title={`结算预览 - ${inspection.inspection_no}`}
-          backUrl="/finance/settlement"
+          
           status={
             <Badge variant={statusVariant}>
               {isAlreadySettled ? `${statusLabel} (${existingSettlement.settlement_no})` : statusLabel}
@@ -268,7 +303,7 @@ export default async function SettlementDetailPage({
               { label: "验收编号", value: inspection.inspection_no },
               { label: "设备", value: inspection.equipment ? `${inspection.equipment.name} (${inspection.equipment.equipment_no})` : "-" },
               { label: "客户", value: inspection.customer ? <Link href={`/sales/customers/${inspection.customer_id}`} className="text-blue-600 hover:underline">{inspection.customer.name}</Link> : "-" },
-              { label: "合同编号", value: inspection.contract ? <Link href={`/sales/contracts/${inspection.contract_id}`} className="text-blue-600 hover:underline">{inspection.contract.contract_no}</Link> : "-" },
+              { label: "合同编号", value: inspection.contract && inspection.contract_id ? <Link href={`/sales/contracts/${inspection.contract_id}`} className="text-blue-600 hover:underline">{inspection.contract.contract_no}</Link> : "-" },
               { label: "验收日期", value: formatDate(inspection.inspected_at) },
               { label: "是否逾期", value: inspection.is_overdue ? `是（${inspection.overdue_days ?? 0}天）` : "否" },
               {
@@ -386,7 +421,7 @@ export default async function SettlementDetailPage({
                   <> 退款金额 {formatCurrency(existingSettlement.refund_amount)}。 <Link href="/finance/refunds" className="underline font-medium">查看退款</Link></>
                 )}
                 {existingSettlement.additional_charge && parseFloat(existingSettlement.additional_charge) > 0 && (
-                  <> 应补金额 {formatCurrency(existingSettlement.additional_charge)}。 <Link href="/finance/receivables" className="underline font-medium">查看应收</Link></>
+                  <> 应补金额 {formatCurrency(existingSettlement.additional_charge)}。 <Link href={`/finance/receivables?customerId=${inspection.customer_id}&status=UNPAID`} className="underline font-medium">查看应收</Link></>
                 )}
               </p>
             </div>
@@ -400,6 +435,7 @@ export default async function SettlementDetailPage({
               inspectionId={id}
               hasRefund={preview.refundAmount > 0}
               hasCharge={preview.additionalCharge > 0}
+              customerId={inspection.customer_id}
             />
           </div>
         )}

@@ -117,7 +117,7 @@ export async function approveReturnRequest(
     .from("return_request").select("*")
     .eq("id", requestId).single();
   if (!rr) return { success: false, error: "退租申请不存在" };
-  if (rr.request_status !== "PENDING_APPROVAL") {
+  if (rr.request_status !== "PENDING") {
     return { success: false, error: "当前状态不允许审批" };
   }
 
@@ -152,6 +152,27 @@ export async function approveReturnRequest(
       updated_at: new Date().toISOString(),
     }).eq("id", contractId);
     if (ctrErr) console.error("终止合同失败:", ctrErr.message);
+
+    // Reset PENDING_OUTBOUND equipment back to IN_STOCK (never left warehouse)
+    const { data: pendingEquip } = await supabase.from("equipment")
+      .select("id").eq("status", "PENDING_OUTBOUND")
+      .eq("current_contract_id", contractId);
+    if (pendingEquip?.length) {
+      for (const eq of pendingEquip) {
+        await supabase.from("equipment").update({
+          status: "IN_STOCK",
+          current_order_id: null,
+          current_contract_id: null,
+          current_customer_id: null,
+          updated_at: new Date().toISOString(),
+        }).eq("id", eq.id);
+        await supabase.from("equipment_status_log").insert({
+          equipment_id: eq.id, from_status: "PENDING_OUTBOUND", to_status: "IN_STOCK",
+          change_reason: "合同终止-退回在库", business_type: "CONTRACT_TERMINATE",
+          business_id: contractId, changed_by: profile.id,
+        });
+      }
+    }
   }
 
   // Complete order
@@ -195,7 +216,7 @@ export async function rejectReturnRequest(
     request_status: "REJECTED",
     remark: reason ?? null,
     updated_at: new Date().toISOString(),
-  }).eq("id", requestId).eq("request_status", "PENDING_APPROVAL");
+  }).eq("id", requestId).eq("request_status", "PENDING");
   if (error) return { success: false, error: error.message };
 
   await supabase.from("audit_log").insert({

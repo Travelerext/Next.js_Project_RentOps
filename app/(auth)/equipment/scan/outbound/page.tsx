@@ -9,6 +9,7 @@ import { scanOutbound } from "@/lib/actions/inventory";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/layout/page-header";
 import { Search, Scan, CheckCircle, XCircle } from "lucide-react";
+import Link from "next/link";
 
 interface EquipmentOption { id: string; equipment_no: string; name: string; status: string; current_order_id: string | null; current_contract_id: string | null; }
 interface WarehouseOption { id: string; name: string; }
@@ -68,7 +69,7 @@ export default function ScanOutboundPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title="租赁出库" subtitle="扫描或选择设备，确认出库信息" backUrl="/equipment" />
+      <PageHeader title="租赁出库" subtitle="扫描或选择设备，确认出库信息" backUrl="_back" />
 
       {/* Result */}
       {result && (
@@ -139,8 +140,8 @@ export default function ScanOutboundPage() {
 
           {orderId && (
             <div className="text-sm text-zinc-600 dark:text-zinc-400">
-              关联订单：<span className="font-mono text-blue-600">{orderId.slice(0, 8)}...</span>
-              {contractId && <span className="ml-3">合同：<span className="font-mono text-blue-600">{contractId.slice(0, 8)}...</span></span>}
+              关联订单：<Link href={`/sales/orders/${orderId}`} className="font-mono text-blue-600 hover:underline">{orderId.slice(0, 8)}...</Link>
+              {contractId && <><span className="ml-3">合同：</span><Link href={`/sales/contracts/${contractId}`} className="font-mono text-blue-600 hover:underline">{contractId.slice(0, 8)}...</Link></>}
             </div>
           )}
           {warehouseId && (

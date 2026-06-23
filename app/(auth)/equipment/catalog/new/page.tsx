@@ -33,7 +33,8 @@ export default function NewEquipmentPage() {
     setLoading(true);
     setError("");
     const formData = new FormData(e.currentTarget);
-    const result = await createEquipment(formData);
+    const categoryId = formData.get("categoryId") as string;
+    const result = await createEquipment(categoryId, formData);
     if (result.success) {
       router.push(`/equipment/catalog/${result.data.id}`);
     } else {
@@ -44,7 +45,7 @@ export default function NewEquipmentPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title="新建设备" subtitle="登记新设备资产信息" backUrl="/equipment/catalog" />
+      <PageHeader title="新建设备" subtitle="登记新设备资产信息" backUrl="_back" />
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><PackagePlus className="h-5 w-5" />设备信息</CardTitle></CardHeader>

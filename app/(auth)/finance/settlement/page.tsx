@@ -21,8 +21,8 @@ import Link from "next/link";
 interface InspectionWithJoins {
   id: string;
   inspection_no: string;
-  order_id: string;
-  contract_id: string;
+  order_id: string | null;
+  contract_id: string | null;
   customer_id: string;
   inspected_at: string;
   is_overdue: boolean;
@@ -95,7 +95,6 @@ export default async function SettlementPage() {
     .select(
       "*, customer:customer_id(name), contract:contract_id(contract_no, total_rent_amount), equipment:equipment_id(equipment_no, name)",
     )
-    .eq("customer_confirmed", true)
     .order("inspected_at", { ascending: false });
 
   // Fetch all settlements to determine which inspections are settled
@@ -161,12 +160,8 @@ export default async function SettlementPage() {
     {
       id: "action",
       header: "操作",
-      cell: (i) => (
-        <Link href={`/finance/settlement/${i.id}`}>
-          <Button size="sm" variant="outline">
-            结算预览
-          </Button>
-        </Link>
+      cell: () => (
+        <span className="text-sm text-blue-600">结算预览</span>
       ),
       className: "text-right",
     },
@@ -224,12 +219,8 @@ export default async function SettlementPage() {
     {
       id: "action",
       header: "操作",
-      cell: (i) => (
-        <Link href={`/finance/settlement/${i.id}`}>
-          <Button size="sm" variant="ghost">
-            查看详情
-          </Button>
-        </Link>
+      cell: () => (
+        <span className="text-sm text-blue-600">查看详情</span>
       ),
       className: "text-right",
     },

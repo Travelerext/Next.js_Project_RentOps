@@ -200,7 +200,7 @@ export default async function ApprovalDetailPage({
         <PageHeader
           title={approval.title}
           subtitle={`${approval.approval_no} · ${TYPE_LABEL}`}
-          backUrl="/approval/pending"
+          backUrl="_back"
           status={
             <Badge
               variant={STATUS_VARIANTS[approval.status] ?? "default"}

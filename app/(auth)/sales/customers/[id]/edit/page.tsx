@@ -75,7 +75,7 @@ export default function EditCustomerPage() {
   if (fetching) {
     return (
       <div className="mx-auto max-w-2xl space-y-6">
-        <PageHeader title="编辑客户" backUrl={`/sales/customers/${id}`} />
+        <PageHeader title="编辑客户" backUrl="_back" />
         <Card><div className="p-8 text-center text-zinc-500">加载中...</div></Card>
       </div>
     );
@@ -83,7 +83,7 @@ export default function EditCustomerPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title="编辑客户" subtitle="修改客户档案信息" backUrl={`/sales/customers/${id}`} />
+      <PageHeader title="编辑客户" subtitle="修改客户档案信息" backUrl="_back" />
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><UserPen className="h-5 w-5" />客户信息</CardTitle></CardHeader>

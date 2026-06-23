@@ -126,7 +126,7 @@ export default async function WorkOrderDetailPage({
         <PageHeader
           title={order.work_order_no}
           subtitle={`设备: ${equipment?.name ?? "-"} (${equipment?.equipment_no ?? "-"})`}
-          backUrl="/maintenance/work-orders"
+          backUrl="_back"
           status={
             <Badge variant={STATUS_VARIANTS[order.status] ?? "default"}>
               {STATUS_LABELS[order.status] ?? order.status}

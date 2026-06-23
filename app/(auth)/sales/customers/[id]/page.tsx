@@ -167,6 +167,15 @@ export default async function CustomerDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
+  // Check if current user is finance (hide edit actions)
+  const { data: { user } } = await supabase.auth.getUser();
+  let isFinance = false;
+  if (user) {
+    const { data: profile } = await supabase.from("profiles")
+      .select("primary_role").eq("supabase_user_id", user.id).maybeSingle();
+    isFinance = profile?.primary_role === "FINANCE" || profile?.primary_role === "FINANCE_MANAGER";
+  }
+
   const [
     { data: customer },
     { data: contacts },
@@ -233,7 +242,7 @@ export default async function CustomerDetailPage({
         <PageHeader
           title={customer.name as string}
           subtitle={`编号: ${customer.customer_no}`}
-          backUrl="/sales/customers"
+          backUrl="_back"
           status={
             customer.lock_ordering ? (
               <Badge variant="danger" pulse>
@@ -243,7 +252,7 @@ export default async function CustomerDetailPage({
               <Badge variant="danger">黑名单</Badge>
             ) : undefined
           }
-          actions={
+          actions={isFinance ? undefined : (
             <>
               <Link href={`/sales/customers/${id}/edit`}>
                 <Button variant="outline" size="sm">
@@ -263,7 +272,7 @@ export default async function CustomerDetailPage({
               />
               <DeleteCustomerButton customerId={customer.id as string} />
             </>
-          }
+          )}
         />
 
         {/* ── Credit & Risk Summary ──────────────────────────────── */}

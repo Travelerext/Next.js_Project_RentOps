@@ -94,7 +94,7 @@ export default async function EquipmentDetailPage({
         <PageHeader
           title={equip.name as string}
           subtitle={equip.equipment_no as string}
-          backUrl="/equipment/catalog"
+          backUrl="_back"
           status={<Badge variant={statusVariant}>{EQUIPMENT_STATUS[equip.status as string] ?? String(equip.status)}</Badge>}
         />
 

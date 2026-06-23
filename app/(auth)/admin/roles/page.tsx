@@ -148,7 +148,7 @@ export default async function AdminRolesPage() {
       <PageHeader
         title="角色与权限管理"
         subtitle={`共 ${allRoles.length} 个角色（${totalBuiltIn} 个已激活内置角色 + ${customRoles.length} 个自定义角色）`}
-        backUrl="/admin"
+        backUrl="_back"
       />
 
       <RoleSection title="岗位角色（7个 · 登录分流 / 面板分配）" roles={positionRoles} />
