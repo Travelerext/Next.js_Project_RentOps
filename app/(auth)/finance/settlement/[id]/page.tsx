@@ -267,8 +267,8 @@ export default async function SettlementDetailPage({
             items={[
               { label: "验收编号", value: inspection.inspection_no },
               { label: "设备", value: inspection.equipment ? `${inspection.equipment.name} (${inspection.equipment.equipment_no})` : "-" },
-              { label: "客户", value: inspection.customer?.name ?? "-" },
-              { label: "合同编号", value: inspection.contract?.contract_no ?? "-" },
+              { label: "客户", value: inspection.customer ? <Link href={`/sales/customers/${inspection.customer_id}`} className="text-blue-600 hover:underline">{inspection.customer.name}</Link> : "-" },
+              { label: "合同编号", value: inspection.contract ? <Link href={`/sales/contracts/${inspection.contract_id}`} className="text-blue-600 hover:underline">{inspection.contract.contract_no}</Link> : "-" },
               { label: "验收日期", value: formatDate(inspection.inspected_at) },
               { label: "是否逾期", value: inspection.is_overdue ? `是（${inspection.overdue_days ?? 0}天）` : "否" },
               {
@@ -383,10 +383,10 @@ export default async function SettlementDetailPage({
               <p className="text-sm text-emerald-700 dark:text-emerald-400">
                 结算单 {existingSettlement.settlement_no} 已创建。
                 {existingSettlement.refund_amount && parseFloat(existingSettlement.refund_amount) > 0 && (
-                  <> 退款金额 {formatCurrency(existingSettlement.refund_amount)}。</>
+                  <> 退款金额 {formatCurrency(existingSettlement.refund_amount)}。 <Link href="/finance/refunds" className="underline font-medium">查看退款</Link></>
                 )}
                 {existingSettlement.additional_charge && parseFloat(existingSettlement.additional_charge) > 0 && (
-                  <> 应补金额 {formatCurrency(existingSettlement.additional_charge)}。</>
+                  <> 应补金额 {formatCurrency(existingSettlement.additional_charge)}。 <Link href="/finance/receivables" className="underline font-medium">查看应收</Link></>
                 )}
               </p>
             </div>

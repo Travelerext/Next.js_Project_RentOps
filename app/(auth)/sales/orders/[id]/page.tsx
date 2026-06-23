@@ -14,6 +14,7 @@ import { SubmitOrderButton } from "./submit-button";
 import { CreateContractButton } from "./create-contract-button";
 import { DeleteDraftButton } from "./delete-draft-button";
 import { CancelOrderButton } from "./cancel-order-button";
+import { RequestReturnButton } from "./request-return-button";
 
 type OrderItem = {
   id: string; quantity: number; actual_unit_price: string | number;
@@ -25,7 +26,7 @@ type Order = {
   id: string; order_no: string; order_status: string; pricing_mode: string;
   planned_start_at: string; planned_end_at: string;
   total_rent_amount: string | number; total_deposit_amount: string | number; paid_amount: string | number;
-  customer: { name: string; customer_no: string; contact_name: string; contact_phone: string } | null;
+  customer: { id: string; name: string; customer_no: string; contact_name: string; contact_phone: string } | null;
 };
 
 const itemCols: Column<OrderItem>[] = [
@@ -43,7 +44,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const supabase = await createClient();
 
   const [orderResult, itemsResult, contractResult] = await Promise.all([
-    supabase.from("rental_order").select("*, customer:customer_id(name, customer_no, contact_name, contact_phone)").eq("id", id).single(),
+    supabase.from("rental_order").select("*, customer:customer_id(id, name, customer_no, contact_name, contact_phone)").eq("id", id).single(),
     supabase.from("rental_order_item").select("*, equipment:equipment_id(equipment_no, name, brand)").eq("order_id", id),
     supabase.from("rental_contract").select("id, contract_no, contract_status").eq("order_id", id).maybeSingle(),
   ]);
@@ -81,6 +82,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               )}
               {["APPROVED", "CONFIRMED"].includes(order.order_status) && !contract ? <CreateContractButton orderId={order.id} /> : null}
               {contract ? <Link href={`/sales/contracts/${contract.id}`}><Button variant="outline">查看合同</Button></Link> : null}
+              {["IN_PROGRESS", "PARTIAL_RETURN", "OVERDUE"].includes(order.order_status) && (
+                <RequestReturnButton orderId={order.id} customerId={order.customer?.id ?? ""} />
+              )}
             </div>
           }
         />

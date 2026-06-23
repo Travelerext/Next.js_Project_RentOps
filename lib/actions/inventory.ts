@@ -66,7 +66,20 @@ export async function scanInbound(
 
   if (error) return { success: false, error: error.message };
 
+  // Advance return_request to PENDING_APPROVAL
+  if (orderId || contractId) {
+    const conditions: string[] = [];
+    if (orderId) conditions.push(`order_id.eq.${orderId}`);
+    if (contractId) conditions.push(`contract_id.eq.${contractId}`);
+    await supabase.from("return_request").update({
+      request_status: "PENDING_APPROVAL",
+      updated_at: new Date().toISOString(),
+    }).or(conditions.join(","))
+      .eq("request_status", "PENDING");
+  }
+
   revalidatePath("/equipment/catalog");
   revalidatePath("/equipment/scan/inbound");
+  revalidatePath("/approval/pending");
   return { success: true, data: null };
 }

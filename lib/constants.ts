@@ -51,6 +51,7 @@ export const CONTRACT_STATUS_VARIANTS: Record<string, string> = {
 // Equipment Status
 export const EQUIPMENT_STATUS: Record<string, string> = {
   IN_STOCK: "在库",
+  PENDING_OUTBOUND: "待出库",
   RENTED: "已租出",
   PENDING_INSPECTION: "待验收",
   IN_MAINTENANCE: "维修中",

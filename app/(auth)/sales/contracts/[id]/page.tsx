@@ -25,7 +25,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
   // Fetch the contract first — bail early if not found
   const { data: contract, error } = await supabase
     .from("rental_contract")
-    .select("*, customer:customer_id(name, contact_name)")
+    .select("*, customer:customer_id(id, name, contact_name)")
     .eq("id", id)
     .maybeSingle();
 
@@ -79,7 +79,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
           title={contract.contract_no as string}
           backUrl="/sales/contracts"
           status={<Badge variant={status === "ACTIVE" ? "success" : status === "SIGNED" ? "info" : "default"}>{CONTRACT_STATUS[status] ?? status}</Badge>}
-          actions={<ContractActions contractId={contract.id as string} status={status} />}
+          actions={<ContractActions contractId={contract.id as string} status={status} customerId={contract.customer?.id as string ?? ""} />}
         />
 
         {/* Contract Document Preview */}

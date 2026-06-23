@@ -105,7 +105,7 @@ BEGIN
     business_type, business_id, changed_by
   ) VALUES (
     p_equipment_id, v_equipment.status, v_new_status, '归还入库',
-    'RETURN_INBOUND', p_order_id, v_profile_id
+    'RETURN_INBOUND', COALESCE(p_order_id, p_contract_id, p_equipment_id), v_profile_id
   );
 
   -- 4. Log location change
@@ -116,7 +116,7 @@ BEGIN
   ) VALUES (
     p_equipment_id, 'PROJECT_SITE', NULL,
     'WAREHOUSE', p_warehouse_id,
-    'RETURN_INBOUND', p_order_id, v_profile_id
+    'RETURN_INBOUND', COALESCE(p_order_id, p_contract_id, p_equipment_id), v_profile_id
   );
 
   -- 5. Update order item status to RETURNED

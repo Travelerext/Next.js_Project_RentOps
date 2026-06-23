@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +14,19 @@ import { Search, ArrowDownToLine, CheckCircle, XCircle } from "lucide-react";
 
 interface EquipmentOption { id: string; equipment_no: string; name: string; status: string; current_order_id: string | null; current_contract_id: string | null; }
 interface WarehouseOption { id: string; name: string; }
+interface ReturnRequestItem {
+  id: string; request_no: string; reason: string | null;
+  customer: { name: string } | null;
+  equipment: { equipment_no: string; name: string } | null;
+  order: { order_no: string } | null;
+  contract: { contract_no: string } | null;
+}
 
 export default function ScanInboundPage() {
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get("orderId") ?? undefined;
+  const contractId = searchParams.get("contractId") ?? undefined;
+
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
   const [equipSearch, setEquipSearch] = useState("");
@@ -24,20 +36,29 @@ export default function ScanInboundPage() {
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [returnRequests, setReturnRequests] = useState<ReturnRequestItem[]>([]);
 
   const supabase = createClient();
 
   useEffect(() => {
     supabase.from("warehouse").select("id, name").order("name").then(({ data }) => setWarehouses(data ?? []));
+    // Fetch pending return requests
+    supabase.from("return_request")
+      .select("*, customer:customer_id(name), equipment:equipment_id(equipment_no, name), order:order_id(order_no), contract:contract_id(contract_no)")
+      .eq("request_status", "PENDING")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setReturnRequests((data ?? []) as unknown as ReturnRequestItem[]));
   }, []);
 
   const searchEquipment = useCallback(async () => {
     let q = supabase.from("equipment").select("id, equipment_no, name, status, current_order_id, current_contract_id")
       .in("status", ["RENTED", "PENDING_INSPECTION"]).eq("scrapped", false).order("equipment_no").limit(30);
+    if (orderId) q = q.eq("current_order_id", orderId);
+    if (contractId) q = q.eq("current_contract_id", contractId);
     if (equipSearch) q = q.or(`name.ilike.%${equipSearch}%,equipment_no.ilike.%${equipSearch}%`);
     const { data } = await q;
     setEquipment(data ?? []);
-  }, [equipSearch]);
+  }, [equipSearch, orderId, contractId]);
 
   useEffect(() => { searchEquipment(); }, [searchEquipment]);
 
@@ -66,6 +87,23 @@ export default function ScanInboundPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title="归还入库" subtitle="扫描或选择出租中设备，完成归还验收" backUrl="/equipment" />
+
+      {/* Pending return requests */}
+      {returnRequests.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="flex items-center gap-2"><ArrowDownToLine className="h-5 w-5" />待处理的退租申请 ({returnRequests.length})</CardTitle></CardHeader>
+          <div className="max-h-48 overflow-y-auto">
+            {returnRequests.map(rr => (
+              <div key={rr.id} className="flex items-center gap-3 px-4 py-2 border-b border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                <span className="font-mono text-xs">{rr.request_no}</span>
+                <span className="text-sm">{rr.customer?.name ?? "-"}</span>
+                <span className="text-xs text-zinc-400">{rr.equipment?.name ?? rr.order?.order_no ?? rr.contract?.contract_no ?? "-"}</span>
+                {rr.reason && <span className="text-xs text-zinc-500 ml-auto truncate max-w-[200px]">{rr.reason}</span>}
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {result && (
         <div className={`rounded-xl border p-4 flex items-start gap-3 ${

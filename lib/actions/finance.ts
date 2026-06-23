@@ -291,18 +291,36 @@ export async function executeRefund(
   }
 
   const { data: refund } = await supabase
-    .from("refund_record").select("*, deposit:deposit_id(available_amount)").eq("id", refundId).single();
+    .from("refund_record").select("*, deposit:deposit_id(*)").eq("id", refundId).single();
   if (!refund) return { success: false, error: "退款记录不存在" };
   if (refund.refund_status !== "APPROVED") {
     return { success: false, error: "只有已审批的退款可执行" };
   }
 
-  const { error } = await supabase.from("refund_record").update({
+  const deposit = refund.deposit as Record<string, unknown> | null;
+  const refundAmount = parseFloat((refund.refund_amount as string) ?? "0");
+  const depositId = refund.deposit_id as string;
+  const currentRefunded = parseFloat((deposit?.refunded_amount as string) ?? "0");
+  const currentAvailable = parseFloat((deposit?.available_amount as string) ?? "0");
+  const newRefunded = currentRefunded + refundAmount;
+  const newAvailable = Math.max(0, currentAvailable - refundAmount);
+
+  const { error: refundError } = await supabase.from("refund_record").update({
     refund_status: "REFUNDED",
     refunded_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }).eq("id", refundId);
-  if (error) return { success: false, error: error.message };
+  if (refundError) return { success: false, error: refundError.message };
+
+  // Update deposit record
+  if (depositId) {
+    await supabase.from("deposit_record").update({
+      refunded_amount: newRefunded,
+      available_amount: newAvailable,
+      deposit_status: newAvailable <= 0 ? "COMPLETED" : "REFUNDED",
+      updated_at: new Date().toISOString(),
+    }).eq("id", depositId);
+  }
 
   revalidatePath("/finance/refunds");
   revalidatePath("/finance/deposits");

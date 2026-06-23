@@ -56,7 +56,7 @@ export default async function DepositsPage() {
         </StatCard>
         <StatCard icon={ArrowDownToLine} label="退款中" value={refunding} color="amber" />
       </StatsGrid>
-      <DataTable columns={cols} data={(data ?? []) as Record<string, unknown>[]} keyExtractor={(d) => d.id as string} emptyMessage="暂无押金记录" />
+      <DataTable columns={cols} data={(data ?? []) as Record<string, unknown>[]} keyExtractor={(d) => d.id as string} rowHref={(d) => `/finance/deposits/${d.id}`} emptyMessage="暂无押金记录" />
     </DataPage>
   );
 }

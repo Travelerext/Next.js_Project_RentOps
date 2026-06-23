@@ -14,8 +14,9 @@ import {
 import { ActivateContractButton } from "./activate-button";
 import { ContractPdfDownload } from "@/components/contract/contract-pdf-download";
 import { FileSignature, Pen, Loader2, Snowflake, Flame } from "lucide-react";
+import { RequestReturnButton } from "../../orders/[id]/request-return-button";
 
-export function ContractActions({ contractId, status }: { contractId: string; status: string }) {
+export function ContractActions({ contractId, status, customerId }: { contractId: string; status: string; customerId: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
@@ -105,6 +106,11 @@ export function ContractActions({ contractId, status }: { contractId: string; st
         </Button>
       )}
       {status === "SIGNED" && <ActivateContractButton contractId={contractId} />}
+
+      {/* Return request — only on ACTIVE contracts */}
+      {status === "ACTIVE" && (
+        <RequestReturnButton contractId={contractId} customerId={customerId} />
+      )}
 
       {/* Freeze / Terminate — only on ACTIVE contracts */}
       {status === "ACTIVE" && (

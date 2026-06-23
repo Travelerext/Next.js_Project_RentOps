@@ -295,6 +295,7 @@ export default async function SettlementPage() {
           columns={pendingColumns}
           data={pending}
           keyExtractor={(i) => i.id}
+          rowHref={(i) => `/finance/settlement/${i.id}`}
           emptyMessage="所有验收记录均已结算完成"
         />
       </div>
@@ -315,6 +316,7 @@ export default async function SettlementPage() {
             columns={settledColumns}
             data={settled}
             keyExtractor={(i) => i.id}
+            rowHref={(i) => `/finance/settlement/${i.id}`}
             emptyMessage="暂无已结算记录"
           />
         </div>

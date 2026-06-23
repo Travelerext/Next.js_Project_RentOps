@@ -256,7 +256,7 @@ BEGIN
     business_type, business_id, changed_by
   ) VALUES (
     p_equipment_id, v_equipment.status, 'RENTED', '租赁出库',
-    'RENTAL_OUTBOUND', p_order_id, v_profile_id
+    'RENTAL_OUTBOUND', COALESCE(p_order_id, p_contract_id, p_equipment_id), v_profile_id
   );
 
   -- 4. Log location change
@@ -267,7 +267,7 @@ BEGIN
   ) VALUES (
     p_equipment_id, 'WAREHOUSE', p_warehouse_id,
     'PROJECT_SITE', NULL,
-    'RENTAL_OUTBOUND', p_order_id, v_profile_id
+    'RENTAL_OUTBOUND', COALESCE(p_order_id, p_contract_id, p_equipment_id), v_profile_id
   );
 
   -- 5. Update order item status

@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Loader2, CheckCircle, AlertTriangle, AlertCircle } from "lucide-react";
 import { confirmSettlement } from "@/lib/actions/settlement";
 import { formatCurrency } from "@/lib/utils";
@@ -86,9 +86,15 @@ export function SettlementConfirmButton({ inspectionId, hasRefund, hasCharge }: 
           )}
 
           {success && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 flex items-start gap-2">
-              <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" />
-              <span>{success}</span>
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400 space-y-2">
+              <div className="flex items-start gap-2">
+                <CheckCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>{success}</span>
+              </div>
+              <div className="flex gap-3">
+                {hasRefund && <Link href="/finance/refunds" className="text-blue-600 hover:underline font-medium">查看退款 →</Link>}
+                {hasCharge && <Link href="/finance/receivables" className="text-blue-600 hover:underline font-medium">查看应收 →</Link>}
+              </div>
             </div>
           )}
 

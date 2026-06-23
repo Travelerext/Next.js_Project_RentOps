@@ -58,7 +58,7 @@ export default async function RefundsPage() {
         <StatCard icon={CheckCircle} label="退款记录" value={(allRefunds ?? []).length} color="blue" />
         <StatCard icon={Ban} label="已驳回" value={rejectedCount} color="red" />
       </StatsGrid>
-      <DataTable columns={cols} data={(data ?? []) as Record<string, unknown>[]} keyExtractor={(r) => r.id as string} emptyMessage="暂无退款记录" />
+      <DataTable columns={cols} data={(data ?? []) as Record<string, unknown>[]} keyExtractor={(r) => r.id as string} rowHref={(r) => `/finance/refunds/${r.id}`} emptyMessage="暂无退款记录" />
     </DataPage>
   );
 }

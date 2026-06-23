@@ -4,25 +4,24 @@ import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { scanOutbound } from "@/lib/actions/inventory";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/layout/page-header";
 import { Search, Scan, CheckCircle, XCircle } from "lucide-react";
 
-interface EquipmentOption { id: string; equipment_no: string; name: string; status: string; }
+interface EquipmentOption { id: string; equipment_no: string; name: string; status: string; current_order_id: string | null; current_contract_id: string | null; }
 interface WarehouseOption { id: string; name: string; }
-interface OrderOption { id: string; order_no: string; }
 
 export default function ScanOutboundPage() {
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
-  const [orders, setOrders] = useState<OrderOption[]>([]);
   const [equipSearch, setEquipSearch] = useState("");
   const [selectedEquipId, setSelectedEquipId] = useState("");
+  const [selectedEquip, setSelectedEquip] = useState<EquipmentOption | null>(null);
   const [warehouseId, setWarehouseId] = useState("");
   const [orderId, setOrderId] = useState("");
+  const [contractId, setContractId] = useState("");
   const [borrowerName, setBorrowerName] = useState("");
   const [signerName, setSignerName] = useState("");
   const [remark, setRemark] = useState("");
@@ -31,15 +30,14 @@ export default function ScanOutboundPage() {
 
   const supabase = createClient();
 
-  // Load warehouses
   useEffect(() => {
     supabase.from("warehouse").select("id, name").order("name").then(({ data }) => setWarehouses(data ?? []));
-    supabase.from("rental_order").select("id, order_no").in("order_status", ["CONFIRMED", "APPROVED", "IN_PROGRESS"]).order("created_at", { ascending: false }).limit(50).then(({ data }) => setOrders(data ?? []));
   }, []);
 
   // Search equipment
   const searchEquipment = useCallback(async () => {
-    let q = supabase.from("equipment").select("id, equipment_no, name, status").eq("status", "IN_STOCK").eq("scrapped", false).order("equipment_no").limit(30);
+    let q = supabase.from("equipment").select("id, equipment_no, name, status, current_order_id, current_contract_id")
+      .in("status", ["PENDING_OUTBOUND"]).eq("scrapped", false).order("equipment_no").limit(30);
     if (equipSearch) q = q.or(`name.ilike.%${equipSearch}%,equipment_no.ilike.%${equipSearch}%`);
     const { data } = await q;
     setEquipment(data ?? []);
@@ -52,13 +50,15 @@ export default function ScanOutboundPage() {
     if (!selectedEquipId || !warehouseId) return;
     setLoading(true);
     setResult(null);
-    const res = await scanOutbound(selectedEquipId, warehouseId, orderId || undefined);
+    const res = await scanOutbound(selectedEquipId, warehouseId, orderId || undefined, contractId || undefined);
     setResult({ success: res.success, message: res.success ? "出库成功！设备已标记为已租出。" : res.error });
     setLoading(false);
     if (res.success) {
       setSelectedEquipId("");
+      setSelectedEquip(null);
       setEquipSearch("");
       setOrderId("");
+      setContractId("");
       setBorrowerName("");
       setSignerName("");
       setRemark("");
@@ -99,28 +99,58 @@ export default function ScanOutboundPage() {
             </div>
             {equipment.length > 0 && (
               <div className="max-h-48 overflow-y-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
-                {equipment.map(e => (
-                  <button key={e.id} type="button" onClick={() => { setSelectedEquipId(e.id); setEquipSearch(`${e.equipment_no} - ${e.name}`); }}
+                {equipment.map(e => {
+                  const isPending = e.status === "PENDING_OUTBOUND";
+                  return (
+                  <button key={e.id} type="button" onClick={async () => {
+                    setSelectedEquipId(e.id);
+                    setSelectedEquip(e);
+                    setEquipSearch(`${e.equipment_no} - ${e.name}`);
+                    setOrderId(e.current_order_id ?? "");
+                    setContractId(e.current_contract_id ?? "");
+                    // Auto-fill warehouse from equipment
+                    if (!warehouseId) {
+                      const { data: eq } = await supabase.from("equipment").select("warehouse_id").eq("id", e.id).single();
+                      if (eq?.warehouse_id) setWarehouseId(eq.warehouse_id);
+                    }
+                    // Auto-fill borrower from customer
+                    const orderId = e.current_order_id;
+                    if (orderId) {
+                      const { data: order } = await supabase.from("rental_order").select("customer:customer_id(contact_name, contact_phone, name)").eq("id", orderId).single();
+                      const contactName = (order?.customer as unknown as { contact_name?: string; name?: string })?.contact_name
+                        || (order?.customer as unknown as { name?: string })?.name || "";
+                      if (contactName && !borrowerName) setBorrowerName(contactName);
+                    }
+                    // Auto-generate remark
+                    if (!remark) setRemark(`${e.equipment_no} ${e.name} 租赁出库`);
+                  }}
                     className={`w-full text-left px-3 py-2 text-sm border-b border-zinc-100 dark:border-zinc-800 last:border-0 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors ${
                       selectedEquipId === e.id ? "bg-blue-50 dark:bg-blue-900/20" : ""
                     }`}>
                     <span className="font-mono text-xs">{e.equipment_no}</span>
                     <span className="ml-2">{e.name}</span>
-                    <Badge variant="success" className="ml-2 text-[10px]">可租</Badge>
+                    <Badge variant={isPending ? "warning" : "success"} className="ml-2 text-[10px]">{isPending ? "待出库" : "可租"}</Badge>
                   </button>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
 
-          <Select id="warehouseId" label="出库仓库 *" value={warehouseId} onChange={e => setWarehouseId(e.target.value)}
-            options={[{ value: "", label: "请选择仓库" }, ...warehouses.map(w => ({ value: w.id, label: w.name }))]} />
-
-          <Select id="orderId" label="关联订单 (可选)" value={orderId} onChange={e => setOrderId(e.target.value)}
-            options={[{ value: "", label: "无关联订单" }, ...orders.map(o => ({ value: o.id, label: o.order_no }))]} />
+          {orderId && (
+            <div className="text-sm text-zinc-600 dark:text-zinc-400">
+              关联订单：<span className="font-mono text-blue-600">{orderId.slice(0, 8)}...</span>
+              {contractId && <span className="ml-3">合同：<span className="font-mono text-blue-600">{contractId.slice(0, 8)}...</span></span>}
+            </div>
+          )}
+          {warehouseId && (
+            <div className="text-sm text-zinc-600 dark:text-zinc-400">
+              出库仓库：<span className="font-medium">{warehouses.find(w => w.id === warehouseId)?.name ?? warehouseId.slice(0, 8)}</span>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
-            <Input id="borrowerName" label="借用人/客户签收人" value={borrowerName} onChange={e => setBorrowerName(e.target.value)} placeholder="签收人姓名" />
+            <Input id="borrowerName" label="收货人" value={borrowerName} onChange={e => setBorrowerName(e.target.value)} placeholder="客户联系人" />
             <Input id="signerName" label="发货人" value={signerName} onChange={e => setSignerName(e.target.value)} placeholder="发货人姓名" />
           </div>
 
