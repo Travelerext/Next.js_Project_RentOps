@@ -32,10 +32,10 @@ export function ApprovalActions({ approvalId }: { approvalId: string }) {
 
   return (
     <div className="flex items-center gap-3">
-      <Button variant="primary" size="md" onClick={handleApprove} disabled={loading}>
+      <Button variant="primary" onClick={handleApprove} disabled={loading}>
         {loading ? "处理中..." : "通过审批"}
       </Button>
-      <Button variant="destructive" size="md" onClick={handleReject} disabled={loading}>
+      <Button variant="destructive" onClick={handleReject} disabled={loading}>
         {loading ? "处理中..." : "拒绝审批"}
       </Button>
     </div>

@@ -221,7 +221,7 @@ export async function approveRefund(
   if (!profile) return { success: false, error: "用户档案不存在" };
 
   const role = profile.primary_role ?? "";
-  if (!["SYSTEM_ADMIN", "FINANCE_MANAGER", "GENERAL_MANAGER"].includes(role)) {
+  if (!["SYSTEM_ADMIN", "FINANCE_MANAGER", "GENERAL_MANAGER", "FINANCE"].includes(role)) {
     return { success: false, error: "无权限操作" };
   }
 
@@ -234,8 +234,6 @@ export async function approveRefund(
 
   const { error } = await supabase.from("refund_record").update({
     refund_status: "APPROVED",
-    approved_by: profile.id,
-    approved_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   }).eq("id", refundId);
   if (error) return { success: false, error: error.message };
@@ -258,7 +256,7 @@ export async function rejectRefund(
   if (!profile) return { success: false, error: "用户档案不存在" };
 
   const role = profile.primary_role ?? "";
-  if (!["SYSTEM_ADMIN", "FINANCE_MANAGER", "GENERAL_MANAGER"].includes(role)) {
+  if (!["SYSTEM_ADMIN", "FINANCE_MANAGER", "GENERAL_MANAGER", "FINANCE"].includes(role)) {
     return { success: false, error: "无权限操作" };
   }
 

@@ -84,11 +84,13 @@ async function calculateSettlement(
     .filter(r => ["UNPAID", "PARTIAL", "OVERDUE"].includes(r.status as string))
     .reduce((s, r) => s + parseFloat(r.unpaid_amount as string), 0);
 
-  // Early return: overpaid rent credit
-  const totalPaid = (allReceivables ?? []).reduce((s, r) => s + parseFloat(r.paid_amount as string), 0);
-  const totalReceivableAmount = (allReceivables ?? []).reduce((s, r) => s + parseFloat(r.amount as string), 0);
+  // Early return: overpaid RENT only (exclude deposit)
+  const rentReceivables = (allReceivables ?? [])
+    .filter(r => r.receivable_type !== "DEPOSIT");
+  const totalRentPaid = rentReceivables.reduce((s, r) => s + parseFloat(r.paid_amount as string), 0);
+  const totalRentAmount = rentReceivables.reduce((s, r) => s + parseFloat(r.amount as string), 0);
   let overpaidRent = 0;
-  if (totalPaid > 0) {
+  if (totalRentPaid > 0) {
     const contractTotalRent = parseFloat(contract.total_rent_amount as string);
     const { data: order } = await supabase
       .from("rental_order").select("planned_start_at, planned_end_at, actual_start_at")
@@ -99,7 +101,7 @@ async function calculateSettlement(
       const actualStart = order.actual_start_at ? new Date(order.actual_start_at as string).getTime() : new Date(order.planned_start_at as string).getTime();
       const actualDays = Math.max(1, Math.ceil((actualEnd - actualStart) / 86400000));
       const proratedRent = contractTotalRent * (actualDays / plannedDays);
-      overpaidRent = Math.max(0, totalPaid - proratedRent);
+      overpaidRent = Math.max(0, totalRentPaid - proratedRent);
     }
   }
 
@@ -145,10 +147,9 @@ async function calculateSettlement(
     ? parseFloat((inspection.repair_estimate as string) ?? "0")
     : 0;
 
-  // 10. Total deduction (net of overpaid rent credit)
-  const grossDeduction = unpaidRent + overdueRent + lateFee + penalty +
+  // 10. Total deduction
+  const totalDeduction = unpaidRent + overdueRent + lateFee + penalty +
     damageCompensation + missingPartsComp + cleaningFee + repairFee;
-  const totalDeduction = Math.max(0, grossDeduction - overpaidRent);
 
   // 11. Deposit balance
   const { data: deposit } = await supabase

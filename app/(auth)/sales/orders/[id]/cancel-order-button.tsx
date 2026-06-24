@@ -28,7 +28,6 @@ export function CancelOrderButton({ orderId }: { orderId: string }) {
   return (
     <Button
       variant={confirming ? "destructive" : "outline"}
-      size="sm"
       onClick={handleCancel}
       disabled={loading}
     >

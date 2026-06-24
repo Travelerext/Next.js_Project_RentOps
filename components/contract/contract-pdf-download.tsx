@@ -210,7 +210,6 @@ export function ContractPdfDownload({ contractId }: Props) {
     <>
       <Button
         variant="outline"
-        size="sm"
         onClick={generatePdf}
         disabled={loading}
       >

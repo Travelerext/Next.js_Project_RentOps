@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ interface EquipmentOption { id: string; equipment_no: string; name: string; stat
 interface WarehouseOption { id: string; name: string; }
 
 export default function ScanOutboundPage() {
+  const pathname = usePathname();
   const [equipment, setEquipment] = useState<EquipmentOption[]>([]);
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
   const [equipSearch, setEquipSearch] = useState("");
@@ -44,7 +46,8 @@ export default function ScanOutboundPage() {
     setEquipment(data ?? []);
   }, [equipSearch]);
 
-  useEffect(() => { searchEquipment(); }, [searchEquipment]);
+  // Load on mount and when search text changes
+  useEffect(() => { searchEquipment(); }, [searchEquipment, pathname]);
 
   async function handleScan(e: React.FormEvent) {
     e.preventDefault();

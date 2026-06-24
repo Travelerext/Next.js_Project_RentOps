@@ -7,14 +7,16 @@ import { approveRefund, rejectRefund, executeRefund } from "@/lib/actions/financ
 
 export function ApproveRefundButton({ refundId }: { refundId: string }) {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const router = useRouter();
   return (
-    <Button size="sm" variant="primary" disabled={loading} onClick={async () => {
-      setLoading(true);
-      await approveRefund(refundId);
-      router.refresh();
+    <><Button size="sm" variant="primary" disabled={loading} onClick={async () => {
+      setLoading(true); setError("");
+      const r = await approveRefund(refundId);
+      if (r.success) router.refresh(); else setError(r.error);
       setLoading(false);
     }}>{loading ? "..." : "通过"}</Button>
+    {error && <span className="text-xs text-red-600 ml-1">{error}</span>}</>
   );
 }
 

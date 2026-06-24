@@ -458,21 +458,20 @@ export default function NewOrderPage() {
           {selectedEquipment.length > 0 && (
             <Card>
               <CardHeader><CardTitle>已选设备 ({selectedEquipment.length})</CardTitle></CardHeader>
-              <div>
-                <table className="w-full text-sm">
-                  <thead><tr className="border-b"><th className="p-2 text-left">编号</th><th className="p-2 text-left">名称</th><th className="p-2 text-right">单价</th><th className="p-2 text-right">押金</th><th className="p-2"></th></tr></thead>
-                  <tbody>
-                    {selectedEquipment.map(item => (
-                      <tr key={item.equipmentId} className="border-b">
-                        <td className="p-2">{item.equipmentNo}</td>
-                        <td className="p-2">{item.name}{item.brand ? ` (${item.brand})` : ""}</td>
-                        <td className="p-2"><Input type="number" value={item.unitPrice} onChange={e => updateEquipmentField(item.equipmentId, "unitPrice", parseFloat(e.target.value) || 0)} className="w-24 text-right" /></td>
-                        <td className="p-2"><Input type="number" value={item.depositAmount} onChange={e => updateEquipmentField(item.equipmentId, "depositAmount", parseFloat(e.target.value) || 0)} className="w-24 text-right" /></td>
-                        <td className="p-2"><Button variant="ghost" size="sm" onClick={() => removeEquipment(item.equipmentId)}><Trash2 className="h-3 w-3 text-red-500" /></Button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="flex flex-col gap-2">
+                {selectedEquipment.map(item => (
+                  <div key={item.equipmentId} className="flex flex-wrap items-center gap-2 p-2 border rounded-lg">
+                    <span className="text-xs font-mono text-zinc-500 w-20 shrink-0">{item.equipmentNo}</span>
+                    <span className="text-sm font-medium flex-1 min-w-[80px] truncate">{item.name}</span>
+                    <label className="flex items-center gap-1 text-xs text-zinc-500 shrink-0">
+                      月租 ¥<Input type="number" value={item.unitPrice} onChange={e => updateEquipmentField(item.equipmentId, "unitPrice", parseFloat(e.target.value) || 0)} className="w-20 h-7 text-right text-sm" />
+                    </label>
+                    <label className="flex items-center gap-1 text-xs text-zinc-500 shrink-0">
+                      押金 ¥<Input type="number" value={item.depositAmount} onChange={e => updateEquipmentField(item.equipmentId, "depositAmount", parseFloat(e.target.value) || 0)} className="w-20 h-7 text-right text-sm" />
+                    </label>
+                    <Button variant="ghost" size="sm" onClick={() => removeEquipment(item.equipmentId)}><Trash2 className="h-3 w-3 text-red-500" /></Button>
+                  </div>
+                ))}
               </div>
             </Card>
           )}
@@ -531,32 +530,26 @@ export default function NewOrderPage() {
               ) : !plannedStartAt || !plannedEndAt ? (
                 <p className="p-4 text-sm text-zinc-400">请填写租期后自动计算</p>
               ) : (
-              <table className="w-full text-sm">
-                <thead><tr className="border-b"><th className="p-2 text-left">设备</th><th className="p-2 text-right">单价</th><th className="p-2 text-center">{pricingMode === "HOURLY" ? "小时" : "天数"}</th><th className="p-2 text-right">租金</th><th className="p-2 text-right">押金</th><th className="p-2 text-right">小计</th></tr></thead>
-                <tbody>
-                  {selectedEquipment.map(item => {
-                    const r = pricingResults[item.equipmentId];
-                    return (
-                      <tr key={item.equipmentId} className="border-b">
-                        <td className="p-2">{item.name}</td>
-                        <td className="p-2 text-right">{formatCurrency(item.unitPrice)}</td>
-                        <td className="p-2 text-center">{r?.days ?? "-"}</td>
-                        <td className="p-2 text-right">{r ? formatCurrency(r.rentAmount) : "-"}</td>
-                        <td className="p-2 text-right">{r ? formatCurrency(r.depositAmount) : "-"}</td>
-                        <td className="p-2 text-right font-medium">{r ? formatCurrency(r.totalAmount) : "-"}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2 font-semibold">
-                    <td className="p-2" colSpan={3}>合计</td>
-                    <td className="p-2 text-right">{formatCurrency(totalRent)}</td>
-                    <td className="p-2 text-right">{formatCurrency(totalDeposit)}</td>
-                    <td className="p-2 text-right text-lg">{formatCurrency(totalRent + totalDeposit)}</td>
-                  </tr>
-                </tfoot>
-              </table>
+              <div className="flex flex-col gap-2">
+                {selectedEquipment.map(item => {
+                  const r = pricingResults[item.equipmentId];
+                  return (
+                    <div key={item.equipmentId} className="flex flex-wrap items-center gap-x-3 gap-y-1 p-2 border rounded-lg text-sm">
+                      <span className="font-medium flex-1 min-w-[80px] truncate">{item.name}</span>
+                      <span className="text-xs text-zinc-500">{pricingMode === "HOURLY" ? `${r?.days ?? "-"}h` : `${r?.days ?? "-"}天`}</span>
+                      <span className="text-xs text-zinc-500">单价 ¥{item.unitPrice.toLocaleString()}</span>
+                      <span className="tabular-nums">租金 ¥{r ? r.rentAmount.toLocaleString() : "-"}</span>
+                      <span className="tabular-nums text-xs text-zinc-500">押金 ¥{r ? r.depositAmount.toLocaleString() : "-"}</span>
+                      <span className="tabular-nums font-semibold">¥{r ? r.totalAmount.toLocaleString() : "-"}</span>
+                    </div>
+                  );
+                })}
+                <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 p-2 border-t-2 font-semibold text-sm">
+                  <span>租金 ¥{totalRent.toLocaleString()}</span>
+                  <span className="text-zinc-500">+ 押金 ¥{totalDeposit.toLocaleString()}</span>
+                  <span className="text-lg">= ¥{(totalRent + totalDeposit).toLocaleString()}</span>
+                </div>
+              </div>
               )}
             </div>
           </Card>

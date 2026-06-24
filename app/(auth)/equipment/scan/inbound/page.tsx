@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, usePathname } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ interface ReturnRequestItem {
 
 export default function ScanInboundPage() {
   const searchParams = useSearchParams();
+  const pathname = usePathname();
   const orderId = searchParams.get("orderId") ?? undefined;
   const contractId = searchParams.get("contractId") ?? undefined;
 
@@ -62,7 +63,7 @@ export default function ScanInboundPage() {
     setEquipment(data ?? []);
   }, [equipSearch, orderId, contractId]);
 
-  useEffect(() => { searchEquipment(); }, [searchEquipment]);
+  useEffect(() => { searchEquipment(); }, [searchEquipment, pathname]);
 
   async function handleScan(e: React.FormEvent) {
     e.preventDefault();

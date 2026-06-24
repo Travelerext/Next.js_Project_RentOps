@@ -28,7 +28,6 @@ export function DeleteDraftButton({ orderId }: { orderId: string }) {
   return (
     <Button
       variant={confirming ? "destructive" : "outline"}
-      size="sm"
       onClick={handleDelete}
       disabled={loading}
     >

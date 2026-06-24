@@ -95,10 +95,11 @@ async function calculatePreview(
     .filter(r => ["UNPAID", "PARTIAL", "OVERDUE"].includes(r.status as string))
     .reduce((s, r) => s + parseFloat(r.unpaid_amount as string), 0);
 
-  // Early return: calculate overpaid rent that should be refunded
-  // Total paid across ALL receivables vs prorated rent owed
-  const totalPaid = (allReceivables ?? []).reduce((s, r) => s + parseFloat(r.paid_amount as string), 0);
-  const totalReceivableAmount = (allReceivables ?? []).reduce((s, r) => s + parseFloat(r.amount as string), 0);
+  // Early return: overpaid RENT only (exclude deposit)
+  const rentReceivables = (allReceivables ?? [])
+    .filter(r => (r.status as string) !== "DEPOSIT" && r.receivable_type !== "DEPOSIT");
+  const totalRentPaid = rentReceivables.reduce((s, r) => s + parseFloat(r.paid_amount as string), 0);
+  const totalRentAmount = rentReceivables.reduce((s, r) => s + parseFloat(r.amount as string), 0);
 
   // Calculate prorated rent for actual usage period
   const contractTotalRent = contract ? parseFloat(contract.total_rent_amount) : 0;
@@ -120,8 +121,8 @@ async function calculatePreview(
     }
   }
 
-  // Overpaid rent (early return refund)
-  const overpaidRent = Math.max(0, totalPaid - proratedRentOwed);
+  // Overpaid rent (early return refund) — rent only, not deposit
+  const overpaidRent = Math.max(0, totalRentPaid - proratedRentOwed);
 
   // Overdue rent
   const dailyRent =
@@ -158,33 +159,30 @@ async function calculatePreview(
     unpaidRent + overdueRent + lateFee + penalty +
     damageCompensation + missingPartsComp + cleaningFee + repairFee;
 
-  // Net: deductions minus overpaid rent credit
-  const netDeduction = Math.max(0, totalDeduction - overpaidRent);
-
   // Deposit balance
   const { data: deposit } = await supabase
     .from("deposit_record")
     .select("available_amount")
     .eq("contract_id", inspection.contract_id)
     .maybeSingle();
-
   const depositBalance = deposit
     ? parseFloat(deposit.available_amount as string)
     : (contract ? parseFloat(contract.deposit_amount) : 0);
 
+  // overpaidRent adds to refundable pool; totalDeduction subtracts from it
   const totalAvailable = depositBalance + overpaidRent;
-  const refundAmount = totalAvailable > netDeduction
-    ? totalAvailable - netDeduction
+  const refundAmount = totalAvailable > totalDeduction
+    ? totalAvailable - totalDeduction
     : 0;
-  const additionalCharge = netDeduction > totalAvailable
-    ? netDeduction - totalAvailable
+  const additionalCharge = totalDeduction > totalAvailable
+    ? totalDeduction - totalAvailable
     : 0;
 
   return {
     unpaidRent, overdueRent, lateFee, lateFeeDesc,
     penalty, penaltyDesc,
     damageCompensation, missingPartsComp, cleaningFee, repairFee,
-    totalDeduction: netDeduction, depositBalance, refundAmount, additionalCharge,
+    totalDeduction, depositBalance, refundAmount, additionalCharge,
     overpaidRent,
   };
 }

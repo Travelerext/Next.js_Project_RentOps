@@ -47,7 +47,6 @@ export function SettlementConfirmButton({ inspectionId, hasRefund, hasCharge, cu
     <>
       <Button
         variant="primary"
-        size="lg"
         onClick={() => setOpen(true)}
       >
         <CheckCircle className="h-4 w-4" />
