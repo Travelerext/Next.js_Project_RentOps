@@ -5,7 +5,7 @@ import { StatCard } from "@/components/data/stat-card";
 import { DataTable, type Column } from "@/components/data/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatCompactCurrency } from "@/lib/utils";
 import { ORDER_STATUS, CONTRACT_STATUS, ORDER_STATUS_VARIANTS, CONTRACT_STATUS_VARIANTS } from "@/lib/constants";
 import Link from "next/link";
 import {

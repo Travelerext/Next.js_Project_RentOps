@@ -25,6 +25,7 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "机械设备租赁管理系统",
   description: "机械设备租赁管理系统 - 订单、合同、设备、财务、维修一体化管理",
+  icons: { icon: "/icon.svg" },
 };
 
 export default function RootLayout({

@@ -6,7 +6,7 @@ import { DataTable, type Column } from "@/components/data/data-table";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateTime, formatCompactCurrency } from "@/lib/utils";
 import { ROLE_LABELS, RISK_LEVELS } from "@/lib/constants";
 import {
   Clock,
@@ -36,6 +36,7 @@ import {
   UserCheck,
   Landmark,
   TriangleAlert,
+  Package,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -774,10 +775,10 @@ async function GeneralManagerView({ profile, displayName, roleLabel }: { profile
     >
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
-        <StatCard icon={TrendingUp} label="本月营收" value={formatCurrency(monthlyRevenue)} color="emerald" />
-        <StatCard icon={DollarSign} label="本月利润(收入-成本)" value={formatCurrency(monthlyProfit)} color="blue" />
+        <StatCard icon={TrendingUp} label="本月营收" value={formatCompactCurrency(monthlyRevenue)} color="emerald" />
+        <StatCard icon={DollarSign} label="本月利润" value={formatCompactCurrency(monthlyProfit)} color="blue" />
         <StatCard icon={Activity} label="设备利用率" value={`${equipmentUtilization}%`} color="purple" />
-        <StatCard icon={TriangleAlert} label="逾期应收" value={formatCurrency(totalOverdueReceivable)} color="red" />
+        <StatCard icon={TriangleAlert} label="逾期应收" value={formatCompactCurrency(totalOverdueReceivable)} color="red" />
         <StatCard icon={Shield} label="高风险客户" value={highRiskCustomerCount ?? 0} color="red" />
         <StatCard icon={Clock} label="待审批总数" value={pendingTotal ?? 0} color="amber" />
       </div>
@@ -834,27 +835,51 @@ async function GeneralManagerView({ profile, displayName, roleLabel }: { profile
       <SectionTitle icon={Activity}>快捷操作</SectionTitle>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Link href="/approval/pending">
-          <Card className="cursor-pointer transition-shadow hover:shadow-md text-center">
+          <Card className="cursor-pointer transition-shadow hover:shadow-md text-center p-4">
             <ListChecks className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
-            <p className="text-sm font-medium">审批列表</p>
+            <p className="text-sm font-medium">待审批</p>
           </Card>
         </Link>
-        <Link href="/reports">
-          <Card className="cursor-pointer transition-shadow hover:shadow-md text-center">
-            <TrendingUp className="h-6 w-6 mx-auto mb-2 text-emerald-600 dark:text-emerald-400" />
-            <p className="text-sm font-medium">经营报表</p>
+        <Link href="/finance">
+          <Card className="cursor-pointer transition-shadow hover:shadow-md text-center p-4">
+            <DollarSign className="h-6 w-6 mx-auto mb-2 text-emerald-600 dark:text-emerald-400" />
+            <p className="text-sm font-medium">财务管理</p>
           </Card>
         </Link>
-        <Link href="/risk-monitoring">
-          <Card className="cursor-pointer transition-shadow hover:shadow-md text-center">
-            <Shield className="h-6 w-6 mx-auto mb-2 text-red-600 dark:text-red-400" />
-            <p className="text-sm font-medium">风险监控</p>
+        <Link href="/equipment/catalog">
+          <Card className="cursor-pointer transition-shadow hover:shadow-md text-center p-4">
+            <Package className="h-6 w-6 mx-auto mb-2 text-purple-600 dark:text-purple-400" />
+            <p className="text-sm font-medium">设备台账</p>
           </Card>
         </Link>
-        <Link href="/audit-log">
-          <Card className="cursor-pointer transition-shadow hover:shadow-md text-center">
-            <History className="h-6 w-6 mx-auto mb-2 text-amber-600 dark:text-amber-400" />
+        <Link href="/sales/orders">
+          <Card className="cursor-pointer transition-shadow hover:shadow-md text-center p-4">
+            <ShoppingCart className="h-6 w-6 mx-auto mb-2 text-amber-600 dark:text-amber-400" />
+            <p className="text-sm font-medium">订单管理</p>
+          </Card>
+        </Link>
+        <Link href="/sales/customers">
+          <Card className="cursor-pointer transition-shadow hover:shadow-md text-center p-4">
+            <Users className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
+            <p className="text-sm font-medium">客户管理</p>
+          </Card>
+        </Link>
+        <Link href="/finance/refunds">
+          <Card className="cursor-pointer transition-shadow hover:shadow-md text-center p-4">
+            <Receipt className="h-6 w-6 mx-auto mb-2 text-red-600 dark:text-red-400" />
+            <p className="text-sm font-medium">退款审批</p>
+          </Card>
+        </Link>
+        <Link href="/admin/audit-log">
+          <Card className="cursor-pointer transition-shadow hover:shadow-md text-center p-4">
+            <History className="h-6 w-6 mx-auto mb-2 text-zinc-600 dark:text-zinc-400" />
             <p className="text-sm font-medium">审计日志</p>
+          </Card>
+        </Link>
+        <Link href="/sales/reports">
+          <Card className="cursor-pointer transition-shadow hover:shadow-md text-center p-4">
+            <TrendingUp className="h-6 w-6 mx-auto mb-2 text-indigo-600 dark:text-indigo-400" />
+            <p className="text-sm font-medium">经营报表</p>
           </Card>
         </Link>
       </div>

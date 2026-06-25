@@ -4,7 +4,7 @@ import { StatsGrid } from "@/components/data/stats-grid";
 import { StatCard } from "@/components/data/stat-card";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, formatCompactCurrency } from "@/lib/utils";
 import {
   DollarSign, AlertTriangle, Banknote, TrendingUp,
   CreditCard, RefreshCcw, ArrowRight, Percent,
@@ -96,12 +96,12 @@ export default async function FinanceDashboardPage() {
   return (
     <DashboardPage title="财务管理工作台" subtitle="应收账款、收款与退款概览">
       <StatsGrid cols={{ mobile: 1, desktop: 4 }}>
-        <StatCard icon={DollarSign} label="应收总额" value={formatCurrency(totalReceivables)} color="blue" />
-        <StatCard icon={Banknote} label="已收金额" value={formatCurrency(collectedAmount)} color="emerald" />
-        <StatCard icon={TrendingUp} label="未收金额" value={formatCurrency(outstandingAmount)} color="red" />
-        <StatCard icon={AlertTriangle} label="逾期金额" value={formatCurrency(overdueAmount)} color="red" />
-        <StatCard icon={CreditCard} label="押金余额" value={formatCurrency(depositBalance)} color="purple" />
-        <StatCard icon={TrendingUp} label="本月营收" value={formatCurrency(monthlyRevenue)} color="emerald" />
+        <StatCard icon={DollarSign} label="应收总额" value={formatCompactCurrency(totalReceivables)} color="blue" />
+        <StatCard icon={Banknote} label="已收金额" value={formatCompactCurrency(collectedAmount)} color="emerald" />
+        <StatCard icon={TrendingUp} label="未收金额" value={formatCompactCurrency(outstandingAmount)} color="red" />
+        <StatCard icon={AlertTriangle} label="逾期金额" value={formatCompactCurrency(overdueAmount)} color="red" />
+        <StatCard icon={CreditCard} label="押金余额" value={formatCompactCurrency(depositBalance)} color="purple" />
+        <StatCard icon={TrendingUp} label="本月营收" value={formatCompactCurrency(monthlyRevenue)} color="emerald" />
         <StatCard icon={Percent} label="回款率" value={`${collectionRate}%`} color={collectionRate >= 80 ? "emerald" : collectionRate >= 50 ? "amber" : "red"} />
         <StatCard icon={RefreshCcw} label="待审批退款" value={pendingRefundCount ?? 0} color="amber" href="/finance/refunds" />
         <StatCard icon={DollarSign} label="快捷操作" color="indigo">

@@ -23,8 +23,8 @@ export function StatCard({ icon: Icon, label, value, color = "blue", href, child
     <div className="flex items-center gap-3">
       <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${c.bg}`}><Icon className={`h-5 w-5 ${c.icon}`} /></div>
       <div className="min-w-0">
-        {value !== undefined && <p className={`text-2xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums ${color === "red" ? "text-red-600 dark:text-red-400" : ""}`}>{value}</p>}
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">{label}</p>
+        {value !== undefined && <p className={`text-2xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums truncate ${color === "red" ? "text-red-600 dark:text-red-400" : ""}`}>{value}</p>}
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{label}</p>
         {children}
       </div>
     </div>

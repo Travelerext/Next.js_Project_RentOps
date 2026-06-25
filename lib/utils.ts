@@ -19,6 +19,17 @@ export function formatCurrency(amount: number | string): string {
   }).format(num);
 }
 
+export function formatCompactCurrency(amount: number | string): string {
+  const num = typeof amount === "string" ? parseFloat(amount) : amount;
+  if (Math.abs(num) >= 10000) {
+    return `¥${(num / 10000).toFixed(2)}万`;
+  }
+  return new Intl.NumberFormat("zh-CN", {
+    style: "currency",
+    currency: "CNY",
+  }).format(num);
+}
+
 export function formatDate(date: Date | string | null | undefined): string {
   if (!date) return "-";
   return new Date(date).toLocaleDateString("zh-CN");

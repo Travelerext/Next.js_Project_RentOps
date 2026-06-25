@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { DataPage } from "@/components/data/data-page";
 import { NotificationsClient } from "@/components/notifications/notifications-client";
+import { AutoMarkRead } from "@/components/notifications/auto-mark-read";
 
 type NotifRow = Record<string, unknown>;
 
@@ -28,6 +29,7 @@ export default async function NotificationsPage() {
       subtitle={`共 ${count ?? 0} 条通知 · ${unreadCount} 条未读`}
       empty={false}
     >
+      <AutoMarkRead />
       <NotificationsClient notifications={notifs} />
     </DataPage>
   );
