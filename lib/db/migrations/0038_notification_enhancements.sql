@@ -10,6 +10,7 @@ ALTER TABLE public.notification ADD COLUMN IF NOT EXISTS read_by uuid;
 ALTER TABLE public.notification ADD COLUMN IF NOT EXISTS read_version integer NOT NULL DEFAULT 0;
 ALTER TABLE public.notification ADD COLUMN IF NOT EXISTS source_event text;
 ALTER TABLE public.notification ADD COLUMN IF NOT EXISTS source_module text;
+ALTER TABLE public.notification ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE public.notification ADD COLUMN IF NOT EXISTS archived_at timestamptz;
 
 DO $$ BEGIN
@@ -19,7 +20,7 @@ DO $$ BEGIN
     ) NOT VALID;
   END IF;
 END $$;
-UPDATE public.notification SET read_at = updated_at WHERE is_read = true AND read_at IS NULL;
+UPDATE public.notification SET read_at = created_at WHERE is_read = true AND read_at IS NULL;
 ALTER TABLE public.notification VALIDATE CONSTRAINT notification_read_consistency;
 
 CREATE INDEX IF NOT EXISTS idx_n_recipient_created ON public.notification(recipient_id, created_at DESC);
