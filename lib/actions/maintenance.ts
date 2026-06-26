@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { generateNo } from "@/lib/utils";
 import type { ActionResult } from "@/lib/action-result";
+import { createNotification } from "@/lib/actions/notification";
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -163,12 +164,13 @@ export async function assignWorkOrder(
   if (error) return { success: false, error: error.message };
 
   // Notify assignee
-  await supabase.from("notification").insert({
-    recipient_id: assigneeId,
-    notification_type: "MAINTENANCE_ASSIGNED",
-    title: "新的维修任务",
-    content: `工单 ${workOrderId} 已分配给你`,
-    business_type: "MAINTENANCE", business_id: workOrderId,
+  await createNotification({
+    recipientId: assigneeId,
+    type: "MAINTENANCE_ASSIGNED",
+    title: "新维修工单指派",
+    content: "您有一个新的维修工单等待处理。",
+    businessType: "MAINTENANCE_WORK_ORDER",
+    businessId: workOrderId,
   });
 
   revalidatePath("/maintenance/work-orders");

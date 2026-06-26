@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { generateNo } from "@/lib/utils";
 import type { ActionResult } from "@/lib/action-result";
+import { createNotifications } from "@/lib/actions/notification";
 
 export async function scanOutbound(
   equipmentId: string,
@@ -30,6 +31,32 @@ export async function scanOutbound(
   });
 
   if (error) return { success: false, error: error.message };
+
+  // Notify salesperson that equipment has been delivered
+  if (orderId) {
+    const { data: orderInfo } = await supabase
+      .from("rental_order")
+      .select("created_by, order_no")
+      .eq("id", orderId)
+      .single();
+
+    if (orderInfo?.created_by) {
+      const { data: equipInfo } = await supabase
+        .from("equipment")
+        .select("equipment_no, name")
+        .eq("id", equipmentId)
+        .single();
+
+      await createNotifications([{
+        recipientId: orderInfo.created_by,
+        type: "EQUIPMENT_OUTBOUND",
+        title: "设备已出库: " + (equipInfo?.equipment_no ?? equipmentId),
+        content: "设备 " + (equipInfo?.equipment_no ?? "") + " " + (equipInfo?.name ?? "") + " 已出库交付。订单: " + (orderInfo.order_no ?? orderId),
+        businessType: "ORDER",
+        businessId: orderId,
+      }]);
+    }
+  }
 
   revalidatePath("/equipment/catalog");
   revalidatePath("/equipment/scan/outbound");
@@ -66,6 +93,37 @@ export async function scanInbound(
   });
 
   if (error) return { success: false, error: error.message };
+
+  // If abnormal, set equipment to PENDING_INSPECTION and notify maintenance
+  if (inspectionResult === 'ABNORMAL') {
+    await supabase.from('equipment')
+      .update({ status: 'PENDING_INSPECTION', updated_at: new Date().toISOString() })
+      .eq('id', equipmentId);
+
+    const { data: equipInfo } = await supabase
+      .from('equipment')
+      .select('equipment_no, name')
+      .eq('id', equipmentId)
+      .single();
+
+    const { data: maintenanceStaff } = await supabase
+      .from('profiles')
+      .select('id')
+      .in('primary_role', ['MAINTENANCE_SUPERVISOR', 'MAINTENANCE', 'SYSTEM_ADMIN'])
+      .eq('account_status', 'ACTIVE');
+
+    if (maintenanceStaff?.length) {
+      const notifs = maintenanceStaff.map(s => ({
+        recipient_id: s.id,
+        notification_type: 'MAINTENANCE_INSPECTION',
+        title: '设备待检修: ' + (equipInfo?.equipment_no ?? equipmentId),
+        content: '设备 ' + (equipInfo?.equipment_no ?? '') + ' ' + (equipInfo?.name ?? '') + ' 归还时标记为异常，请安排检查。备注: ' + (notes ?? '无'),
+        business_type: 'INBOUND',
+        business_id: equipmentId,
+      }));
+      await supabase.from('notification').insert(notifs);
+    }
+  }
 
   // Create return_inspection and advance return_request using saved IDs
   // ... existing code continues below

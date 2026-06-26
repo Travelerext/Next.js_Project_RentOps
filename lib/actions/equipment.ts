@@ -174,3 +174,71 @@ export async function updateEquipmentStatus(
   revalidatePath(`/equipment/catalog/${equipmentId}`);
   return { success: true, data: null };
 }
+
+
+// Maintenance check after inbound inspection
+// If OK -> equipment back to IN_STOCK
+// If needs repair -> create maintenance work order and set to IN_MAINTENANCE
+export async function maintenanceCheck(
+  equipmentId: string,
+  result: 'OK' | 'NEEDS_REPAIR',
+  notes?: string
+): Promise<ActionResult<null>> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: '未登录' };
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('supabase_user_id', user.id)
+    .maybeSingle();
+  if (!profile) return { success: false, error: '用户档案不存在' };
+
+  const newStatus = result === 'OK' ? 'IN_STOCK' : 'IN_MAINTENANCE';
+
+  const { data: current } = await supabase
+    .from('equipment')
+    .select('status')
+    .eq('id', equipmentId)
+    .single();
+
+  const { error } = await supabase
+    .from('equipment')
+    .update({
+      status: newStatus,
+      updated_by: profile.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', equipmentId);
+
+  if (error) return { success: false, error: error.message };
+
+  await supabase.from('equipment_status_log').insert({
+    equipment_id: equipmentId,
+    from_status: current?.status,
+    to_status: newStatus,
+    change_reason: result === 'OK' ? '维修复查通过' : '维修复查需维修',
+    business_type: 'MAINTENANCE_CHECK',
+    business_id: equipmentId,
+    changed_by: profile.id,
+  });
+
+  // If needs repair, create a maintenance work order
+  if (result === 'NEEDS_REPAIR') {
+    const workOrderNo = 'MWO' + Date.now().toString(36).toUpperCase();
+    await supabase.from('maintenance_work_order').insert({
+      equipment_id: equipmentId,
+      work_order_no: workOrderNo,
+      fault_description: notes ?? '归还验收异常，运维检查确认需维修',
+      fault_level: 'NORMAL',
+      status: 'PENDING_DISPATCH',
+      reported_by: profile.id,
+    });
+  }
+
+  revalidatePath('/equipment/catalog/' + equipmentId);
+  revalidatePath('/equipment/catalog');
+  revalidatePath('/equipment/scan/inbound');
+  return { success: true, data: null };
+}

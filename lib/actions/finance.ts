@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { generateNo } from "@/lib/utils";
 import type { ActionResult } from "@/lib/action-result";
+import { createNotification } from "@/lib/actions/notification";
 
 // ─── Schemas ──────────────────────────────────────────────────────────
 
@@ -62,6 +63,32 @@ export async function confirmPayment(
   });
 
   if (error) return { success: false, error: error.message };
+
+  // Notify salesperson about payment confirmation
+  const { data: receivable } = await supabase
+    .from("receivable")
+    .select("order_id, contract_id, customer_id, amount")
+    .eq("id", receivableId)
+    .single();
+
+  if (receivable?.order_id) {
+    const { data: order } = await supabase
+      .from("rental_order")
+      .select("created_by, order_no")
+      .eq("id", receivable.order_id)
+      .single();
+
+    if (order?.created_by) {
+      await createNotification({
+        recipientId: order.created_by,
+        type: "PAYMENT_CONFIRMED",
+        title: "收款确认: " + order.order_no,
+        content: "订单 " + (order.order_no ?? "") + " 已收到付款 " + (parsed.data?.amount ?? 0).toString() + "。",
+        businessType: "ORDER",
+        businessId: receivable.order_id,
+      });
+    }
+  }
 
   revalidatePath("/finance/receivables");
   revalidatePath("/finance/payments");

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { generateNo } from "@/lib/utils";
 import type { ActionResult } from "@/lib/action-result";
+import { createNotifications } from "@/lib/actions/notification";
 
 // ─── Renew Contract ────────────────────────────────────────────────────
 
@@ -252,6 +253,32 @@ export async function activateContract(
   });
 
   if (error) return { success: false, error: error.message };
+
+  // Notify finance about contract activation (receivable generated)
+  const { data: contractInfo } = await supabase
+    .from("rental_contract")
+    .select("contract_no")
+    .eq("id", contractId)
+    .single();
+
+  const { data: financeUsers } = await supabase
+    .from("profiles")
+    .select("id")
+    .in("primary_role", ["FINANCE", "FINANCE_MANAGER", "SYSTEM_ADMIN"])
+    .eq("account_status", "ACTIVE");
+
+  if (financeUsers?.length) {
+    await createNotifications(
+      financeUsers.map((f) => ({
+        recipientId: f.id,
+        type: "CONTRACT_ACTIVE",
+        title: "合同已激活: " + (contractInfo?.contract_no ?? contractId),
+        content: "合同 " + (contractInfo?.contract_no ?? "") + " 已激活，应收已生成。请关注收款。",
+        businessType: "CONTRACT",
+        businessId: contractId,
+      }))
+    );
+  }
 
   revalidatePath("/sales/contracts");
   revalidatePath(`/sales/contracts/${contractId}`);

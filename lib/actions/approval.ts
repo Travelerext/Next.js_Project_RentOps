@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
 import { generateNo } from "@/lib/utils";
 import type { ActionResult } from "@/lib/action-result";
+import { createNotification, createNotifications } from "@/lib/actions/notification";
 
 export async function submitForApproval(
   businessType: string,
@@ -57,15 +58,16 @@ export async function submitForApproval(
     .eq("account_status", "ACTIVE");
 
   if (approvers && approvers.length > 0) {
-    const notifications = approvers.map((a) => ({
-      recipient_id: a.id,
-      notification_type: "APPROVAL_PENDING",
-      title: `新的审批请求: ${title}`,
-      content: description ?? title,
-      business_type: businessType,
-      business_id: businessId,
-    }));
-    await supabase.from("notification").insert(notifications);
+    await createNotifications(
+      approvers.map((a) => ({
+        recipientId: a.id,
+        type: "APPROVAL_PENDING",
+        title: `新的审批请求: ${title}`,
+        content: description ?? title,
+        businessType,
+        businessId,
+      }))
+    );
   }
 
   revalidatePath("/approval/pending");
@@ -179,13 +181,13 @@ export async function approveRequest(
       .eq("business_id", approval.business_id);
 
     // Notify applicant
-    await supabase.from("notification").insert({
-      recipient_id: approval.applicant_id,
-      notification_type: "APPROVAL_RESULT",
-      title: `审批已通过: ${approval.title}`,
-      content: "您的审批申请已通过",
-      business_type: approval.business_type,
-      business_id: approval.business_id,
+    await createNotification({
+      recipientId: approval.applicant_id,
+      type: "APPROVAL_RESULT",
+      title: "审批结果: " + approval.title,
+      content: "审批已通过",
+      businessType: approval.business_type,
+      businessId: approval.business_id,
     });
   } else {
     // Find the next unapproved step
@@ -307,13 +309,13 @@ export async function rejectRequest(
     .eq("business_type", approval.business_type)
     .eq("business_id", approval.business_id);
 
-  await supabase.from("notification").insert({
-    recipient_id: approval.applicant_id,
-    notification_type: "APPROVAL_RESULT",
-    title: `审批已拒绝: ${approval.title}`,
-    content: reason ?? "您的审批申请已被拒绝",
-    business_type: approval.business_type,
-    business_id: approval.business_id,
+  await createNotification({
+    recipientId: request.applicant_id,
+    type: "APPROVAL_RESULT",
+    title: "审批结果: " + request.title,
+    content: "您的审批申请已被驳回" + (reason ? "：" + reason : ""),
+    businessType: request.business_type,
+    businessId: request.business_id,
   });
 
   revalidatePath("/approval/pending");

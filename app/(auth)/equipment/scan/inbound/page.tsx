@@ -163,14 +163,23 @@ export default function ScanInboundPage() {
             </div>
           )}
 
-          <Select id="inspectionResult" label="验收结果 *" value={inspectionResult} onChange={e => setInspectionResult(e.target.value)}
-            options={[
-              { value: "NORMAL", label: "✅ 正常" },
-              { value: "DAMAGED", label: "🔧 有损坏" },
-              { value: "MISSING_PARTS", label: "⚠️ 缺少配件" },
-              { value: "DIRTY", label: "🧹 脏污" },
-              { value: "NEEDS_REPAIR", label: "🔩 需要维修" },
-            ]} />
+          <div>
+            <label className="mb-2 block text-sm font-medium">验收结果</label>
+            <div className="flex gap-3">
+              <button type="button"
+                className={"flex-1 rounded-lg border-2 px-4 py-3 text-center text-sm font-semibold transition-colors " +
+                  (inspectionResult === 'NORMAL' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 hover:border-green-300')}
+                onClick={() => setInspectionResult('NORMAL')}>
+                正常
+              </button>
+              <button type="button"
+                className={"flex-1 rounded-lg border-2 px-4 py-3 text-center text-sm font-semibold transition-colors " +
+                  (inspectionResult === 'ABNORMAL' ? 'border-amber-500 bg-amber-50 text-amber-700' : 'border-gray-200 hover:border-amber-300')}
+                onClick={() => setInspectionResult('ABNORMAL')}>
+                异常
+              </button>
+            </div>
+          </div>
 
           <Input id="notes" label="验收备注" value={notes} onChange={e => setNotes(e.target.value)}
             placeholder="损坏描述、缺失配件说明、清洁情况..." />
