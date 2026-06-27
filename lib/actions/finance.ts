@@ -22,6 +22,215 @@ const requestRefundSchema = z.object({
   reason: z.string().optional(),
 });
 
+const generateInvoiceSchema = z.object({
+  invoiceType: z.enum(["SPECIAL_VAT", "NORMAL_VAT", "ELECTRONIC_NORMAL"]).default("SPECIAL_VAT"),
+  taxRate: z.coerce.number().min(0, "税率不能小于0").max(1, "税率不能超过100%").default(0.13),
+  title: z.string().trim().optional(),
+  taxNo: z.string().trim().optional(),
+  addressPhone: z.string().trim().optional(),
+  bankAccount: z.string().trim().optional(),
+  remark: z.string().trim().optional(),
+});
+
+function money(value: unknown): number {
+  const n = typeof value === "number" ? value : parseFloat(String(value ?? "0"));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function roundMoney(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+// ─── Generate Invoice From Order ─────────────────────────────────────
+
+export async function generateOrderInvoice(
+  orderId: string,
+  formData: FormData
+): Promise<ActionResult<{ id: string; invoiceNo: string; existing: boolean }>> {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "未登录" };
+
+  if (!orderId || orderId.length < 10) {
+    return { success: false, error: "订单ID无效" };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, primary_role")
+    .eq("supabase_user_id", user.id)
+    .maybeSingle();
+  if (!profile) return { success: false, error: "用户档案不存在" };
+
+  const role = profile.primary_role ?? "";
+  if (!["SYSTEM_ADMIN", "FINANCE", "FINANCE_MANAGER"].includes(role)) {
+    return { success: false, error: "只有财务人员可以生成发票" };
+  }
+
+  const { data: existing } = await supabase
+    .from("invoice_record")
+    .select("id, invoice_no")
+    .eq("order_id", orderId)
+    .maybeSingle();
+  if (existing) {
+    return {
+      success: true,
+      data: { id: existing.id as string, invoiceNo: existing.invoice_no as string, existing: true },
+    };
+  }
+
+  const raw = {
+    invoiceType: (formData.get("invoiceType") as string) || "SPECIAL_VAT",
+    taxRate: (formData.get("taxRate") as string) || "0.13",
+    title: (formData.get("title") as string) || undefined,
+    taxNo: (formData.get("taxNo") as string) || undefined,
+    addressPhone: (formData.get("addressPhone") as string) || undefined,
+    bankAccount: (formData.get("bankAccount") as string) || undefined,
+    remark: (formData.get("remark") as string) || undefined,
+  };
+  const parsed = generateInvoiceSchema.safeParse(raw);
+  if (!parsed.success) {
+    const fieldErrors = parsed.error.flatten().fieldErrors as Record<string, string[]>;
+    return { success: false, error: "参数校验失败", fieldErrors };
+  }
+
+  const [{ data: order }, { data: items }, { data: contract }] = await Promise.all([
+    supabase
+      .from("rental_order")
+      .select(`
+        id, order_no, customer_id, order_status, total_rent_amount, total_deposit_amount,
+        transport_fee, material_fee, other_fee, discount_amount,
+        customer:customer_id(name, tax_no, invoice_title, invoice_address_phone, invoice_bank_account)
+      `)
+      .eq("id", orderId)
+      .maybeSingle(),
+    supabase
+      .from("rental_order_item")
+      .select("id, quantity, pricing_mode, actual_unit_price, rent_amount, equipment:equipment_id(equipment_no, name)")
+      .eq("order_id", orderId),
+    supabase
+      .from("rental_contract")
+      .select("id, contract_no")
+      .eq("order_id", orderId)
+      .maybeSingle(),
+  ]);
+
+  if (!order) return { success: false, error: "订单不存在" };
+  if (["DRAFT", "CANCELLED"].includes(order.order_status as string)) {
+    return { success: false, error: "草稿或已取消订单不能生成发票" };
+  }
+
+  const customer = order.customer as unknown as {
+    name: string;
+    tax_no: string | null;
+    invoice_title: string | null;
+    invoice_address_phone: string | null;
+    invoice_bank_account: string | null;
+  } | null;
+
+  const totalRent = money(order.total_rent_amount);
+  const transportFee = money(order.transport_fee);
+  const materialFee = money(order.material_fee);
+  const otherFee = money(order.other_fee);
+  const discountAmount = money(order.discount_amount);
+  const invoiceTotal = roundMoney(Math.max(0, totalRent + transportFee + materialFee + otherFee - discountAmount));
+
+  if (invoiceTotal <= 0) {
+    return { success: false, error: "订单没有可开票金额" };
+  }
+
+  const taxRate = parsed.data.taxRate;
+  const amountWithoutTax = taxRate > 0 ? roundMoney(invoiceTotal / (1 + taxRate)) : invoiceTotal;
+  const taxAmount = roundMoney(invoiceTotal - amountWithoutTax);
+  const title = parsed.data.title || customer?.invoice_title || customer?.name;
+  if (!title) return { success: false, error: "缺少发票抬头" };
+
+  const itemSnapshot = [
+    ...((items ?? []) as Record<string, unknown>[]).map((item) => {
+      const equipment = item.equipment as { equipment_no?: string; name?: string } | null;
+      return {
+        name: equipment?.name ?? "租赁设备",
+        specification: equipment?.equipment_no ?? "",
+        quantity: money(item.quantity),
+        unit_price: money(item.actual_unit_price),
+        amount: money(item.rent_amount),
+        pricing_mode: item.pricing_mode ?? "",
+      };
+    }),
+    ...(transportFee > 0 ? [{ name: "运输费", specification: "", quantity: 1, unit_price: transportFee, amount: transportFee, pricing_mode: "FEE" }] : []),
+    ...(materialFee > 0 ? [{ name: "材料费", specification: "", quantity: 1, unit_price: materialFee, amount: materialFee, pricing_mode: "FEE" }] : []),
+    ...(otherFee > 0 ? [{ name: "其他费用", specification: "", quantity: 1, unit_price: otherFee, amount: otherFee, pricing_mode: "FEE" }] : []),
+    ...(discountAmount > 0 ? [{ name: "优惠折扣", specification: "", quantity: 1, unit_price: -discountAmount, amount: -discountAmount, pricing_mode: "DISCOUNT" }] : []),
+  ];
+
+  const invoiceNo = generateNo("INV");
+  const { data: inserted, error } = await supabase
+    .from("invoice_record")
+    .insert({
+      invoice_no: invoiceNo,
+      customer_id: order.customer_id,
+      order_id: order.id,
+      contract_id: contract?.id ?? null,
+      invoice_type: parsed.data.invoiceType,
+      invoice_status: "ISSUED",
+      title,
+      tax_no: parsed.data.taxNo || customer?.tax_no || null,
+      address_phone: parsed.data.addressPhone || customer?.invoice_address_phone || null,
+      bank_account: parsed.data.bankAccount || customer?.invoice_bank_account || null,
+      amount_without_tax: amountWithoutTax,
+      tax_rate: taxRate,
+      tax_amount: taxAmount,
+      total_amount: invoiceTotal,
+      item_snapshot: itemSnapshot,
+      remark: parsed.data.remark ?? null,
+      created_by: profile.id,
+      updated_by: profile.id,
+    })
+    .select("id, invoice_no")
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      const { data: current } = await supabase
+        .from("invoice_record")
+        .select("id, invoice_no")
+        .eq("order_id", orderId)
+        .maybeSingle();
+      if (current) {
+        return {
+          success: true,
+          data: { id: current.id as string, invoiceNo: current.invoice_no as string, existing: true },
+        };
+      }
+    }
+    return { success: false, error: error.message };
+  }
+
+  await supabase.from("audit_log").insert({
+    actor_id: profile.id,
+    action: "INVOICE_GENERATE",
+    resource_type: "INVOICE",
+    resource_id: inserted.id,
+    detail: {
+      invoice_no: inserted.invoice_no,
+      order_no: order.order_no,
+      order_id: order.id,
+      amount: invoiceTotal,
+    },
+  });
+
+  revalidatePath("/finance/invoices");
+  revalidatePath(`/finance/invoices/${inserted.id}`);
+  revalidatePath(`/sales/orders/${orderId}`);
+  revalidatePath("/customer/invoices");
+
+  return {
+    success: true,
+    data: { id: inserted.id as string, invoiceNo: inserted.invoice_no as string, existing: false },
+  };
+}
+
 // ─── Confirm Payment ──────────────────────────────────────────────────
 
 export async function confirmPayment(

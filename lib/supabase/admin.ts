@@ -1,4 +1,4 @@
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+   import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Supabase client with service_role privileges.

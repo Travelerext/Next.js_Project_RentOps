@@ -55,6 +55,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "工作台", href: "/finance", icon: LayoutDashboard },
     { label: "应收账款", href: "/finance/receivables", icon: Receipt },
     { label: "收款记录", href: "/finance/payments", icon: CreditCard },
+    { label: "发票管理", href: "/finance/invoices", icon: FileText },
     { label: "押金管理", href: "/finance/deposits", icon: Banknote },
     { label: "退款管理", href: "/finance/refunds", icon: DollarSign },
     { label: "退租结算", href: "/finance/settlement", icon: Calculator },
@@ -80,6 +81,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "首页", href: "/customer", icon: LayoutDashboard },
     { label: "我的合同", href: "/customer/contracts", icon: FileText },
     { label: "账单查询", href: "/customer/bills", icon: DollarSign },
+    { label: "发票管理", href: "/customer/invoices", icon: Receipt },
   ],
 
   // ─── Supervisor dashboard menus (5 new - only links to existing pages) ──
@@ -106,6 +108,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "待审批", href: "/approval/pending", icon: ClipboardList },
     { label: "应收账款", href: "/finance/receivables", icon: Receipt },
     { label: "收款记录", href: "/finance/payments", icon: CreditCard },
+    { label: "发票管理", href: "/finance/invoices", icon: FileText },
     { label: "押金管理", href: "/finance/deposits", icon: Banknote },
     { label: "退款管理", href: "/finance/refunds", icon: DollarSign },
     { label: "退租结算", href: "/finance/settlement", icon: Calculator },
@@ -138,6 +141,7 @@ const ROLE_EXTRA_LINKS: Record<string, MenuItem[]> = {
   FINANCE_MANAGER: [
     { label: "应收账款", href: "/finance/receivables", icon: Receipt },
     { label: "收款记录", href: "/finance/payments", icon: CreditCard },
+    { label: "发票管理", href: "/finance/invoices", icon: FileText },
     { label: "退款管理", href: "/finance/refunds", icon: DollarSign },
   ],
   GENERAL_MANAGER: [

@@ -108,6 +108,7 @@ export default async function FinanceDashboardPage() {
           <div className="mt-1 flex flex-wrap gap-1">
             <Link href="/finance/receivables" className="rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-700 dark:bg-red-900/20 dark:text-red-400">应收</Link>
             <Link href="/finance/payments" className="rounded-md bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700 dark:bg-blue-900/20 dark:text-blue-400">收款</Link>
+            <Link href="/finance/invoices" className="rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:bg-sky-900/20 dark:text-sky-400">发票</Link>
             <Link href="/finance/deposits" className="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400">押金</Link>
             <Link href="/finance/refunds" className="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">退款</Link>
             <Link href="/finance/settlement" className="rounded-md bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-700 dark:bg-purple-900/20 dark:text-purple-400">结算</Link>

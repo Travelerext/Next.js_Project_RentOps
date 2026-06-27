@@ -14,6 +14,7 @@ import { SubmitOrderButton } from "./submit-button";
 import { CreateContractButton } from "./create-contract-button";
 import { DeleteDraftButton } from "./delete-draft-button";
 import { CancelOrderButton } from "./cancel-order-button";
+import { GenerateInvoiceButton } from "./generate-invoice-button";
 
 type OrderItem = {
   id: string; quantity: number; actual_unit_price: string | number;
@@ -25,7 +26,10 @@ type Order = {
   id: string; order_no: string; order_status: string; pricing_mode: string;
   planned_start_at: string; planned_end_at: string;
   total_rent_amount: string | number; total_deposit_amount: string | number; paid_amount: string | number;
-  customer: { id: string; name: string; customer_no: string; contact_name: string; contact_phone: string } | null;
+  customer: {
+    id: string; name: string; customer_no: string; contact_name: string; contact_phone: string;
+    tax_no: string | null; invoice_title: string | null; invoice_address_phone: string | null; invoice_bank_account: string | null;
+  } | null;
 };
 
 const itemCols: Column<OrderItem>[] = [
@@ -50,10 +54,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     isFinance = p?.primary_role === "FINANCE" || p?.primary_role === "FINANCE_MANAGER";
   }
 
-  const [orderResult, itemsResult, contractResult] = await Promise.all([
-    supabase.from("rental_order").select("*, customer:customer_id(id, name, customer_no, contact_name, contact_phone)").eq("id", id).single(),
+  const [orderResult, itemsResult, contractResult, invoiceResult] = await Promise.all([
+    supabase.from("rental_order").select("*, customer:customer_id(id, name, customer_no, contact_name, contact_phone, tax_no, invoice_title, invoice_address_phone, invoice_bank_account)").eq("id", id).single(),
     supabase.from("rental_order_item").select("*, equipment:equipment_id(equipment_no, name, brand)").eq("order_id", id),
     supabase.from("rental_contract").select("id, contract_no, contract_status").eq("order_id", id).maybeSingle(),
+    supabase.from("invoice_record").select("id, invoice_no").eq("order_id", id).maybeSingle(),
   ]);
 
   const order = orderResult.data as unknown as Order | null;
@@ -68,6 +73,8 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
   const items = (itemsResult.data ?? []) as unknown as OrderItem[];
   const contract = contractResult.data as { id: string } | null;
+  const invoice = invoiceResult.data as { id: string; invoice_no: string } | null;
+  const canInvoice = isFinance && !["DRAFT", "CANCELLED"].includes(order.order_status);
 
   return (
     <DirectionalTransition>
@@ -76,21 +83,35 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
           title={order.order_no}
           backUrl="_back"
           status={<Badge variant={order.order_status === "OVERDUE" ? "danger" : order.order_status === "IN_PROGRESS" ? "success" : "default"}>{ORDER_STATUS[order.order_status] ?? order.order_status}</Badge>}
-          actions={isFinance ? undefined : (
+          actions={
             <div className="flex gap-2">
-              {order.order_status === "DRAFT" && (
+              {canInvoice ? (
+                <GenerateInvoiceButton
+                  orderId={order.id}
+                  existingInvoiceId={invoice?.id}
+                  defaults={{
+                    title: order.customer?.invoice_title ?? order.customer?.name,
+                    taxNo: order.customer?.tax_no,
+                    addressPhone: order.customer?.invoice_address_phone,
+                    bankAccount: order.customer?.invoice_bank_account,
+                  }}
+                />
+              ) : invoice ? (
+                <Link href={`/finance/invoices/${invoice.id}`}><Button variant="outline">查看发票</Button></Link>
+              ) : null}
+              {!isFinance && order.order_status === "DRAFT" && (
                 <>
                   <AddItemForm orderId={order.id} />
                   <SubmitOrderButton orderId={order.id} />
                 </>
               )}
-              {["SUBMITTED", "PENDING_APPROVAL", "APPROVED", "CONFIRMED"].includes(order.order_status) && (
+              {!isFinance && ["SUBMITTED", "PENDING_APPROVAL", "APPROVED", "CONFIRMED"].includes(order.order_status) && (
                 <CancelOrderButton orderId={order.id} />
               )}
-              {["APPROVED", "CONFIRMED"].includes(order.order_status) && !contract ? <CreateContractButton orderId={order.id} /> : null}
+              {!isFinance && ["APPROVED", "CONFIRMED"].includes(order.order_status) && !contract ? <CreateContractButton orderId={order.id} /> : null}
               {contract ? <Link href={`/sales/contracts/${contract.id}`}><Button variant="outline">查看合同</Button></Link> : null}
             </div>
-          )}
+          }
         />
 
         <Card>

@@ -4,6 +4,7 @@ import {
   varchar,
   integer,
   decimal,
+  jsonb,
   text,
   date,
   timestamp,
@@ -155,7 +156,34 @@ export const reconciliationStatement = pgTable("reconciliation_statement", {
   version: integer("version").notNull().default(1),
 });
 
+export const invoiceRecord = pgTable("invoice_record", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  invoiceNo: varchar("invoice_no", { length: 50 }).unique().notNull(),
+  customerId: uuid("customer_id").notNull(),
+  orderId: uuid("order_id").notNull(),
+  contractId: uuid("contract_id"),
+  invoiceType: varchar("invoice_type", { length: 50 }).notNull().default("SPECIAL_VAT"),
+  invoiceStatus: varchar("invoice_status", { length: 50 }).notNull().default("ISSUED"),
+  title: varchar("title", { length: 300 }).notNull(),
+  taxNo: varchar("tax_no", { length: 50 }),
+  addressPhone: text("address_phone"),
+  bankAccount: text("bank_account"),
+  amountWithoutTax: decimal("amount_without_tax", { precision: 15, scale: 2 }).notNull(),
+  taxRate: decimal("tax_rate", { precision: 5, scale: 4 }).notNull().default("0.1300"),
+  taxAmount: decimal("tax_amount", { precision: 15, scale: 2 }).notNull(),
+  totalAmount: decimal("total_amount", { precision: 15, scale: 2 }).notNull(),
+  itemSnapshot: jsonb("item_snapshot").notNull().default([]),
+  issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  remark: text("remark"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  createdBy: uuid("created_by"),
+  updatedBy: uuid("updated_by"),
+  version: integer("version").notNull().default(1),
+});
+
 export type Receivable = typeof receivable.$inferSelect;
 export type PaymentRecord = typeof paymentRecord.$inferSelect;
 export type DepositRecord = typeof depositRecord.$inferSelect;
 export type RefundRecord = typeof refundRecord.$inferSelect;
+export type InvoiceRecord = typeof invoiceRecord.$inferSelect;
