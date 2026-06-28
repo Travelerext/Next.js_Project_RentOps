@@ -74,7 +74,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   const items = (itemsResult.data ?? []) as unknown as OrderItem[];
   const contract = contractResult.data as { id: string } | null;
   const invoice = invoiceResult.data as { id: string; invoice_no: string } | null;
-  const canInvoice = isFinance && !["DRAFT", "CANCELLED"].includes(order.order_status);
+  const canInvoice = !["DRAFT", "CANCELLED"].includes(order.order_status);
 
   return (
     <DirectionalTransition>

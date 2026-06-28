@@ -64,8 +64,8 @@ export async function generateOrderInvoice(
   if (!profile) return { success: false, error: "用户档案不存在" };
 
   const role = profile.primary_role ?? "";
-  if (!["SYSTEM_ADMIN", "FINANCE", "FINANCE_MANAGER"].includes(role)) {
-    return { success: false, error: "只有财务人员可以生成发票" };
+  if (!["SYSTEM_ADMIN", "FINANCE", "FINANCE_MANAGER", "SALES", "SALES_MANAGER"].includes(role)) {
+    return { success: false, error: "无权生成发票" };
   }
 
   const { data: existing } = await supabase

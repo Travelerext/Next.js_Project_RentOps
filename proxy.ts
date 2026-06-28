@@ -38,7 +38,7 @@ const ROLE_ROUTE_MAP: Record<string, string[]> = {
 };
 
 // Shared routes accessible by all roles
-const SHARED_PREFIXES = ["/equipment/catalog", "/profile", "/notifications", "/sales/orders/", "/sales/contracts/"];
+const SHARED_PREFIXES = ["/equipment/catalog", "/profile", "/notifications", "/sales/orders/", "/sales/contracts/", "/finance/invoices/"];
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;

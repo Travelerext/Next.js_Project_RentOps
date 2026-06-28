@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { FileText, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { DataPage } from "@/components/data/data-page";
 import { DataTable, type Column } from "@/components/data/data-table";
@@ -83,10 +83,16 @@ export default async function FinanceInvoicesPage({
       subtitle={`共 ${count ?? 0} 张发票`}
       pagination={totalPages > 1 ? { page, totalPages, baseUrl: "/finance/invoices", query: paginationQuery || undefined } : undefined}
       actions={
-        <Link href="/finance">
-          <Button variant="outline"><FileText className="h-4 w-4" />财务工作台</Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/finance/invoices/new">
+            <Button variant="primary"><Plus className="h-4 w-4" />新增发票</Button>
+          </Link>
+          <Link href="/finance">
+            <Button variant="outline"><FileText className="h-4 w-4" />财务工作台</Button>
+          </Link>
+        </div>
       }
+      fab={{ href: "/finance/invoices/new", label: "新增发票" }}
       empty={false}
     >
       <form method="GET" className="flex flex-wrap items-end gap-3 border-b border-zinc-200 pb-4 dark:border-zinc-700">
