@@ -3,16 +3,18 @@ import type { ReactNode } from "react";
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={cn("rounded-xl border border-zinc-200 bg-white p-4 md:p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/80", className)}>
+    <section className={cn("surface-panel rounded-lg p-4 transition-[box-shadow,border-color,transform] duration-150 md:p-5", className)}>
       {children}
-    </div>
+    </section>
   );
 }
 
 export function CardHeader({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between", className)}>{children}</div>;
+  return <div className={cn("-mx-1 mb-4 flex flex-col gap-2 border-b border-app-border px-1 pb-3 sm:flex-row sm:items-center sm:justify-between", className)}>{children}</div>;
 }
 
 export function CardTitle({ children, className }: { children: ReactNode; className?: string }) {
-  return <h3 className={cn("text-base md:text-lg font-semibold text-zinc-900 dark:text-zinc-100 text-pretty", className)}>{children}</h3>;
+  return <h3 className={cn("text-sm font-semibold tracking-normal text-app-fg text-pretty", className)}>{children}</h3>;
 }
+
+

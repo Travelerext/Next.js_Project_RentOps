@@ -29,7 +29,6 @@ import {
   TrendingUp,
   CalendarDays,
   Shield,
-  CreditCard,
   Building2,
   FileText,
   Activity,
@@ -58,13 +57,6 @@ type ApprovalDetail = {
   applicant_id: string;
   submitted_at: string;
   applicant: { display_name: string } | null;
-};
-
-type CustomerRiskItem = {
-  id: string;
-  name: string;
-  risk_level: string;
-  is_blacklisted: boolean;
 };
 
 type OverdueReceivableItem = {
@@ -177,7 +169,7 @@ export default async function ApprovalDashboardPage() {
 // SALES_MANAGER (业务主管)
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function SalesManagerView({ profile, displayName, roleLabel }: { profile: Profile | null; displayName: string; roleLabel: string }) {
+async function SalesManagerView({ displayName, roleLabel }: { profile: Profile | null; displayName: string; roleLabel: string }) {
   const supabase = await createClient();
 
   const today = new Date();
@@ -260,7 +252,7 @@ async function SalesManagerView({ profile, displayName, roleLabel }: { profile: 
     .limit(5);
 
   const highRiskIds = (highRiskCustomers ?? []).map((c) => c.id);
-  let overdueByCustomer = new Map<string, number>();
+  const overdueByCustomer = new Map<string, number>();
   if (highRiskIds.length > 0) {
     const { data: overdueRecv } = await supabase
       .from("receivable")
@@ -434,7 +426,7 @@ async function SalesManagerView({ profile, displayName, roleLabel }: { profile: 
 // FINANCE_MANAGER (财务主管)
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function FinanceManagerView({ profile, displayName, roleLabel }: { profile: Profile | null; displayName: string; roleLabel: string }) {
+async function FinanceManagerView({ displayName, roleLabel }: { profile: Profile | null; displayName: string; roleLabel: string }) {
   const supabase = await createClient();
 
   const today = new Date();
@@ -475,7 +467,6 @@ async function FinanceManagerView({ profile, displayName, roleLabel }: { profile
 
   const overdueList = ((overdueReceivables ?? []) as unknown) as { id: string; amount: string; unpaid_amount: string; due_date: string; overdue_days: number; customer: { name: string } | null }[];
   const totalOverdueAmount = overdueList.reduce((s, r) => s + parseFloat(r.unpaid_amount ?? "0"), 0);
-  const overdueCount = overdueList.length;
 
   const monthlyRevenue = (monthlyRevenueData ?? []).reduce((s: number, r: { amount: string }) => s + parseFloat(r.amount ?? "0"), 0);
 
@@ -626,7 +617,7 @@ async function FinanceManagerView({ profile, displayName, roleLabel }: { profile
 // GENERAL_MANAGER (总经理)
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function GeneralManagerView({ profile, displayName, roleLabel }: { profile: Profile | null; displayName: string; roleLabel: string }) {
+async function GeneralManagerView({ displayName, roleLabel }: { profile: Profile | null; displayName: string; roleLabel: string }) {
   const supabase = await createClient();
 
   const today = new Date();

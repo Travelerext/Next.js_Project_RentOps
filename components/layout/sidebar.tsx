@@ -1,16 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, Truck, FileText, DollarSign, Wrench,
-  CheckSquare, Package, Scan, Settings, ChevronLeft, Menu, X,
+  CheckSquare, Package, Scan, Settings, ChevronLeft, X,
   UserPlus, ShoppingCart, AlertTriangle, BarChart3, ClipboardList,
   Calendar, Shield, CreditCard, Receipt, Banknote, ArrowLeftRight,
-  HardHat, Boxes, Hammer, Gauge, Calculator, TrendingUp, ListChecks,
-  History, PlusCircle, type LucideIcon,
+  HardHat, Boxes, Gauge, Calculator, TrendingUp, ListChecks,
+  History, PlusCircle, BrainCircuit, type LucideIcon,
 } from "lucide-react";
 
 // ─── Menu item type ────────────────────────────────────────────────────
@@ -150,6 +150,10 @@ const ROLE_EXTRA_LINKS: Record<string, MenuItem[]> = {
   ],
 };
 
+const GLOBAL_MENU_ITEMS: MenuItem[] = [
+  { label: "AI 助手", href: "/ai", icon: BrainCircuit },
+];
+
 // ─── Props ─────────────────────────────────────────────────────────────
 interface Props {
   dashboard: string;
@@ -189,25 +193,28 @@ function useIsActive() {
 export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggle, onMobileClose }: Props) {
   const isActive = useIsActive();
   const pathname = usePathname();
-
-  // Stable ref for callbacks to avoid unnecessary effect re-runs
-  const onMobileCloseRef = { current: onMobileClose };
-  onMobileCloseRef.current = onMobileClose;
+  const compact = collapsed && !mobileOpen;
+  const dashboardRootHref = MENUS[dashboard]?.[0]?.href;
 
   // Base items + role-specific extras
-  const baseItems = MENUS[dashboard] ?? [];
-  const extras = ROLE_EXTRA_LINKS[primaryRole ?? ""] ?? [];
-  // Deduplicate: don't add extras that already exist in base
-  const existingHrefs = new Set(baseItems.map(i => i.href));
-  const items = [...baseItems, ...extras.filter(e => !existingHrefs.has(e.href))];
+  const items = useMemo(() => {
+    const baseItems = MENUS[dashboard] ?? [];
+    const extras = ROLE_EXTRA_LINKS[primaryRole ?? ""] ?? [];
+    const existingHrefs = new Set([...GLOBAL_MENU_ITEMS, ...baseItems].map((i) => i.href));
+    return [
+      ...GLOBAL_MENU_ITEMS,
+      ...baseItems,
+      ...extras.filter((e) => !existingHrefs.has(e.href)),
+    ];
+  }, [dashboard, primaryRole]);
 
   // Close on Escape
   useEffect(() => {
     if (!mobileOpen) return;
-    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") onMobileCloseRef.current(); };
+    const fn = (e: KeyboardEvent) => { if (e.key === "Escape") onMobileClose(); };
     document.addEventListener("keydown", fn);
     return () => document.removeEventListener("keydown", fn);
-  }, [mobileOpen]);
+  }, [mobileOpen, onMobileClose]);
 
   // Lock body scroll
   useEffect(() => {
@@ -216,7 +223,7 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
   }, [mobileOpen]);
 
   // Close mobile on route change
-  useEffect(() => { onMobileCloseRef.current(); }, [pathname]);
+  useEffect(() => { onMobileClose(); }, [pathname, onMobileClose]);
 
   // Role label for display
   const roleLabel = primaryRole ? {
@@ -228,32 +235,32 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
   const nav = (
     <>
       {/* Brand */}
-      <div className="flex h-14 items-center justify-between border-b border-zinc-200 px-4 dark:border-zinc-800">
-        {!collapsed && (
+      <div className="flex h-16 items-center justify-between border-b border-app-border px-3 md:h-[4.5rem]">
+        {!compact && (
           <div className="flex items-center gap-2 truncate">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-600">
-              <HardHat className="h-4 w-4 text-white" />
+            <div className="brand-mark flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
+              <HardHat className="h-4 w-4 text-app-accent-contrast" />
             </div>
-            <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100 truncate">
-              设备租赁管理
-            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-app-fg">RentOps</p>
+            </div>
           </div>
         )}
-        {collapsed && (
-          <div className="mx-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-600">
-            <HardHat className="h-4 w-4 text-white" />
+        {compact && (
+          <div className="brand-mark mx-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
+            <HardHat className="h-4 w-4 text-app-accent-contrast" />
           </div>
         )}
         <button
           onClick={onToggle}
-          className="hidden md:flex rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="focus-ring hidden rounded-lg border border-transparent p-1.5 text-app-muted transition-colors hover:border-app-border hover:bg-app-surface hover:text-app-fg md:flex"
           aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
         >
           <ChevronLeft className={cn("h-4 w-4 transition-transform duration-200", collapsed && "rotate-180")} />
         </button>
         <button
           onClick={onMobileClose}
-          className="md:hidden rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="focus-ring rounded-lg p-1.5 text-app-muted transition-colors hover:bg-app-surface-muted hover:text-app-fg md:hidden"
           aria-label="关闭菜单"
         >
           <X className="h-5 w-5" />
@@ -261,17 +268,17 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
       </div>
 
       {/* Role badge */}
-      {!collapsed && roleLabel && (
-        <div className="px-3 pt-2 pb-0">
-          <span className="inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-400">
+      {!compact && roleLabel && (
+        <div className="px-3 pb-1 pt-3">
+          <span className="premium-control inline-flex rounded-md border border-app-border px-2 py-1 text-[10px] font-semibold text-app-muted-strong">
             {roleLabel}
           </span>
         </div>
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2 overscroll-contain" role="navigation" aria-label="主导航">
-        {items.map((item, index) => {
+      <nav className="flex-1 space-y-1 overflow-y-auto p-2 overscroll-contain" role="navigation" aria-label="主导航">
+        {items.map((item) => {
           const hasChildren = !!item.children?.length;
 
           // ── Active detection ───────────────────────────────────
@@ -296,8 +303,8 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
               return isActive(item.href);
             }
 
-            // Dashboard root (first item) always uses exact match
-            if (index === 0) return isActive(item.href, true);
+            // Dashboard root always uses exact match.
+            if (item.href === dashboardRootHref) return isActive(item.href, true);
 
             // For childless items: only active if no OTHER childless sibling
             // has a longer href (or same path + extra params) that also
@@ -321,20 +328,23 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
               <Link
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+                  "focus-ring group relative flex min-h-10 items-center gap-3 rounded-lg border px-3 py-2.5 text-sm font-medium transition-[background-color,border-color,color,box-shadow,transform]",
                   active
-                    ? "bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-                    : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                    ? "border-app-border-strong bg-app-surface text-app-accent shadow-[var(--shadow-sm)]"
+                    : "border-transparent text-app-muted-strong hover:-translate-y-px hover:border-app-border hover:bg-app-surface/70 hover:text-app-fg"
                 )}
-                title={collapsed ? item.label : undefined}
+                title={compact ? item.label : undefined}
                 aria-current={active ? "page" : undefined}
               >
-                <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                {!collapsed && (
+                {active && <span className="absolute left-0 top-2 h-6 w-1 rounded-r-full bg-app-accent shadow-[0_0_18px_color-mix(in_srgb,var(--accent)_44%,transparent)]" aria-hidden="true" />}
+                <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors", active ? "bg-app-accent-soft" : "group-hover:bg-app-surface-muted")}>
+                  <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                </span>
+                {!compact && (
                   <>
                     <span className="flex-1 truncate">{item.label}</span>
                     {item.badge && (
-                      <span className="ml-auto rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      <span className="ml-auto rounded-full bg-app-danger px-1.5 py-0.5 text-[10px] font-bold text-white">
                         {item.badge}
                       </span>
                     )}
@@ -343,8 +353,8 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
               </Link>
 
               {/* Sub-menu */}
-              {!collapsed && hasChildren && (
-                <div className="ml-8 mt-0.5 space-y-0.5 border-l border-zinc-200 pl-3 dark:border-zinc-700">
+              {!compact && hasChildren && (
+                <div className="ml-8 mt-1 space-y-0.5 border-l border-app-border pl-3">
                   {item.children!.map((child) => {
                     const childActive = isActive(child.href, true);
                     return (
@@ -354,8 +364,8 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
                         className={cn(
                           "block rounded-md px-3 py-1.5 text-sm transition-colors",
                           childActive
-                            ? "text-blue-700 dark:text-blue-400 font-medium"
-                            : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-500 dark:hover:text-zinc-300"
+                            ? "bg-app-accent-soft font-semibold text-app-accent"
+                            : "text-app-muted hover:bg-app-surface-muted hover:text-app-fg"
                         )}
                       >
                         {child.label}
@@ -376,7 +386,7 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          "hidden md:flex flex-col border-r border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 transition-[width] duration-200 ease-in-out",
+          "app-chrome relative z-30 hidden flex-col border-r border-app-border transition-[width] duration-200 ease-in-out md:flex",
           collapsed ? "w-16" : "w-60"
         )}
         style={{ viewTransitionName: "site-sidebar" }}
@@ -384,21 +394,12 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
         {nav}
       </aside>
 
-      {/* Mobile hamburger */}
-      <button
-        onClick={onToggle}
-        className="md:hidden fixed top-3 left-3 z-40 rounded-lg border border-zinc-200 bg-white/90 backdrop-blur-sm p-2 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-        aria-label="打开菜单"
-      >
-        <Menu className="h-5 w-5 text-zinc-600 dark:text-zinc-300" />
-      </button>
-
       {/* Mobile drawer */}
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50">
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onMobileClose} aria-hidden="true" />
+          <div className="fixed inset-0 bg-black/45 backdrop-blur-sm animate-fade-in" onClick={onMobileClose} aria-hidden="true" />
           <aside
-            className="fixed top-0 left-0 bottom-0 w-64 flex flex-col bg-white dark:bg-zinc-900 animate-slide-in-left safe-top safe-bottom overscroll-contain"
+            className="safe-top safe-bottom surface-panel fixed bottom-0 left-0 top-0 flex w-72 max-w-[86vw] flex-col animate-slide-in-left overscroll-contain"
             role="dialog" aria-modal="true" aria-label="导航菜单"
           >
             {nav}
@@ -408,3 +409,5 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
     </>
   );
 }
+
+

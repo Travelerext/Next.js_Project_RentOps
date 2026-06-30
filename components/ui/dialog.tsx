@@ -30,21 +30,21 @@ export function Dialog({ open, onOpenChange, title, children, className }: Props
 
   return (
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={close} aria-hidden="true" />
+      <div className="fixed inset-0 bg-black/45 backdrop-blur-sm animate-fade-in" onClick={close} aria-hidden="true" />
       <div
         role="dialog" aria-modal="true" aria-label={title}
         className={cn(
-          "relative z-10 w-full bg-white shadow-xl dark:bg-zinc-800",
+          "surface-panel-elevated relative z-10 w-full shadow-[var(--shadow-md)]",
           "animate-slide-up md:animate-scale-in",
-          "rounded-t-2xl md:rounded-xl md:max-w-lg md:mx-4",
+          "rounded-t-lg md:mx-4 md:max-w-lg md:rounded-lg",
           "max-h-[85vh] overflow-y-auto overscroll-contain",
           "safe-bottom", className,
         )}
       >
         {title && (
-          <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200 bg-white px-4 md:px-6 py-4 dark:border-zinc-700 dark:bg-zinc-800 rounded-t-2xl md:rounded-t-xl">
+          <div className="app-chrome sticky top-0 z-10 flex items-center justify-between rounded-t-lg border-b border-app-border px-4 py-4 md:px-6">
             <h2 className="text-lg font-semibold text-pretty">{title}</h2>
-            <button type="button" onClick={close} className="rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label="关闭">
+            <button type="button" onClick={close} className="focus-ring rounded-lg p-1.5 text-app-muted hover:bg-app-surface-muted hover:text-app-fg" aria-label="关闭">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -54,3 +54,5 @@ export function Dialog({ open, onOpenChange, title, children, className }: Props
     </div>
   );
 }
+
+

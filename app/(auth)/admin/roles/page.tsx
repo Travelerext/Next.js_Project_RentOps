@@ -169,7 +169,7 @@ export default async function AdminRolesPage() {
           <p>• <strong>主管角色（5个）</strong>：业务主管、财务主管、设备主管、总经理、维修主管，用于审批流程和任务派发。</p>
           <p>• <strong>自定义角色</strong>：管理员可根据需要创建额外角色，配置不同权限组合。</p>
           <p>• <strong>权限控制层级</strong>：数据库 RLS → 路由保护 → Server Action 校验 → UI 按钮隐藏（四层防护）。</p>
-          <p>• 点击角色的"配置权限"按钮进入权限分配页面。</p>
+          <p>• 点击角色的&quot;配置权限&quot;按钮进入权限分配页面。</p>
         </div>
       </Card>
     </div>

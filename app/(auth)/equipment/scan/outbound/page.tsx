@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { usePathname } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,6 @@ export default function ScanOutboundPage() {
   const [warehouses, setWarehouses] = useState<WarehouseOption[]>([]);
   const [equipSearch, setEquipSearch] = useState("");
   const [selectedEquipId, setSelectedEquipId] = useState("");
-  const [selectedEquip, setSelectedEquip] = useState<EquipmentOption | null>(null);
   const [warehouseId, setWarehouseId] = useState("");
   const [orderId, setOrderId] = useState("");
   const [contractId, setContractId] = useState("");
@@ -31,23 +30,36 @@ export default function ScanOutboundPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    supabase.from("warehouse").select("id, name").order("name").then(({ data }) => setWarehouses(data ?? []));
-  }, []);
+    let cancelled = false;
+    supabase.from("warehouse").select("id, name").order("name").then(({ data }) => {
+      if (!cancelled) setWarehouses(data ?? []);
+    });
+    return () => { cancelled = true; };
+  }, [supabase]);
 
   // Search equipment
-  const searchEquipment = useCallback(async () => {
+  const loadEquipment = useCallback(async () => {
     let q = supabase.from("equipment").select("id, equipment_no, name, status, current_order_id, current_contract_id")
       .in("status", ["PENDING_OUTBOUND"]).eq("scrapped", false).order("equipment_no").limit(30);
     if (equipSearch) q = q.or(`name.ilike.%${equipSearch}%,equipment_no.ilike.%${equipSearch}%`);
     const { data } = await q;
     setEquipment(data ?? []);
-  }, [equipSearch]);
+  }, [supabase, equipSearch]);
 
   // Load on mount and when search text changes
-  useEffect(() => { searchEquipment(); }, [searchEquipment, pathname]);
+  useEffect(() => {
+    let cancelled = false;
+    let q = supabase.from("equipment").select("id, equipment_no, name, status, current_order_id, current_contract_id")
+      .in("status", ["PENDING_OUTBOUND"]).eq("scrapped", false).order("equipment_no").limit(30);
+    if (equipSearch) q = q.or(`name.ilike.%${equipSearch}%,equipment_no.ilike.%${equipSearch}%`);
+    q.then(({ data }) => {
+      if (!cancelled) setEquipment(data ?? []);
+    });
+    return () => { cancelled = true; };
+  }, [supabase, equipSearch, pathname]);
 
   async function handleScan(e: React.FormEvent) {
     e.preventDefault();
@@ -59,14 +71,13 @@ export default function ScanOutboundPage() {
     setLoading(false);
     if (res.success) {
       setSelectedEquipId("");
-      setSelectedEquip(null);
       setEquipSearch("");
       setOrderId("");
       setContractId("");
       setBorrowerName("");
       setSignerName("");
       setRemark("");
-      searchEquipment();
+      loadEquipment();
     }
   }
 
@@ -108,7 +119,6 @@ export default function ScanOutboundPage() {
                   return (
                   <button key={e.id} type="button" onClick={async () => {
                     setSelectedEquipId(e.id);
-                    setSelectedEquip(e);
                     setEquipSearch(`${e.equipment_no} - ${e.name}`);
                     setOrderId(e.current_order_id ?? "");
                     setContractId(e.current_contract_id ?? "");

@@ -45,18 +45,6 @@ const STATUS_VARIANTS: Record<string, "default" | "success" | "warning" | "dange
   CANCELLED: "default",
 };
 
-const FAULT_LEVEL_LABELS: Record<string, string> = {
-  EMERGENCY: "紧急",
-  URGENT: "急",
-  NORMAL: "普通",
-};
-
-const FAULT_LEVEL_VARIANTS: Record<string, "default" | "success" | "warning" | "danger" | "info"> = {
-  EMERGENCY: "danger",
-  URGENT: "warning",
-  NORMAL: "default",
-};
-
 const PLAN_STATUS_LABELS: Record<string, string> = {
   ACTIVE: "进行中",
   INACTIVE: "已停用",
@@ -113,10 +101,6 @@ interface MonthlyFeeRow {
 
 function StatusBadge({ status }: { status: string }) {
   return <Badge variant={STATUS_VARIANTS[status] ?? "default"}>{STATUS_LABELS[status] ?? status}</Badge>;
-}
-
-function FaultLevelBadge({ level }: { level: string }) {
-  return <Badge variant={FAULT_LEVEL_VARIANTS[level] ?? "default"}>{FAULT_LEVEL_LABELS[level] ?? level}</Badge>;
 }
 
 function PlanStatusBadge({ status }: { status: string }) {

@@ -9,21 +9,24 @@ interface Props { title: string; subtitle?: string; backUrl?: string; status?: R
 
 export function PageHeader({ title, subtitle, backUrl, status, actions }: Props) {
   const router = useRouter();
+  const backClass = "focus-ring premium-control inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-app-border text-app-muted transition-colors hover:text-app-fg";
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3 min-w-0">
+    <div className="flex flex-col gap-4 rounded-lg border border-transparent py-1 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 items-start gap-3">
         {backUrl === "_back" ? (
-          <button onClick={() => router.back()} className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label="返回"><ArrowLeft className="h-4 w-4" /></button>
+          <button onClick={() => router.back()} className={backClass} aria-label="返回"><ArrowLeft className="h-4 w-4" /></button>
         ) : backUrl ? (
-          <Link href={backUrl} className="shrink-0 inline-flex items-center justify-center h-8 w-8 rounded-lg text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500" aria-label="返回"><ArrowLeft className="h-4 w-4" /></Link>
+          <Link href={backUrl} className={backClass} aria-label="返回"><ArrowLeft className="h-4 w-4" /></Link>
         ) : null}
         <div className="min-w-0">
-          <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 text-pretty truncate">{title}</h1>
-          {subtitle && <p className="text-sm text-zinc-500 mt-0.5">{subtitle}</p>}
+          <h1 className="truncate text-[30px] font-semibold leading-tight tracking-normal text-app-fg text-pretty sm:text-[34px]">{title}</h1>
+          {subtitle && <p className="mt-2 max-w-3xl text-sm leading-6 text-app-muted sm:text-[15px]">{subtitle}</p>}
         </div>
         {status && <div className="shrink-0">{status}</div>}
       </div>
-      {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+      {actions && <div className="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:justify-end">{actions}</div>}
     </div>
   );
 }
+
+

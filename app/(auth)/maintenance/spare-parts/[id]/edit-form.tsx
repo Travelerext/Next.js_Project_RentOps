@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,7 +41,7 @@ const STATUS_OPTIONS = [
 
 export function EditSparePartForm({ part, canManage }: { part: SparePartData; canManage: boolean }) {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -100,28 +100,30 @@ export function EditSparePartForm({ part, canManage }: { part: SparePartData; ca
     part.warehouse ? { id: part.warehouse.id, name: part.warehouse.name } : null
   );
 
-  // Search models
-  const searchModels = useCallback(async () => {
+  useEffect(() => {
+    let cancelled = false;
     let q = supabase.from("equipment_model")
       .select("id, model_name, brand")
       .order("model_name").limit(20);
     if (modelSearch) q = q.ilike("model_name", `%${modelSearch}%`);
-    const { data } = await q;
-    setModelList((data ?? []) as ModelOption[]);
+    q.then(({ data }) => {
+      if (!cancelled) setModelList((data ?? []) as ModelOption[]);
+    });
+    return () => { cancelled = true; };
   }, [modelSearch, supabase]);
-  useEffect(() => { searchModels(); }, [searchModels]);
 
-  // Search warehouses
-  const searchWarehouses = useCallback(async () => {
+  useEffect(() => {
+    let cancelled = false;
     let q = supabase.from("warehouse")
       .select("id, name")
       .eq("enabled", true)
       .order("name").limit(20);
     if (whSearch) q = q.ilike("name", `%${whSearch}%`);
-    const { data } = await q;
-    setWhList((data ?? []) as WarehouseOption[]);
+    q.then(({ data }) => {
+      if (!cancelled) setWhList((data ?? []) as WarehouseOption[]);
+    });
+    return () => { cancelled = true; };
   }, [whSearch, supabase]);
-  useEffect(() => { searchWarehouses(); }, [searchWarehouses]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

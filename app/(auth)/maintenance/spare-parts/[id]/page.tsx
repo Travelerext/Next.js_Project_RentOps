@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 import { DataPage } from "@/components/data/data-page";
 import { EditSparePartForm } from "./edit-form";
 

@@ -7,7 +7,7 @@ import { DataTable, type Column } from "@/components/data/data-table";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ORDER_STATUS } from "@/lib/constants";
-import { FileText, TrendingUp, Users, DollarSign, ShoppingCart, CheckCircle } from "lucide-react";
+import { FileText, TrendingUp, Users, DollarSign, ShoppingCart } from "lucide-react";
 
 export default async function SalesReportsPage() {
   const supabase = await createClient();

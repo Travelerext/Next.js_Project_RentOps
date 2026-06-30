@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams, usePathname } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,19 +41,25 @@ export default function ScanInboundPage() {
   const [result, setResult] = useState<{ success: boolean; message: string } | null>(null);
   const [returnRequests, setReturnRequests] = useState<ReturnRequestItem[]>([]);
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   useEffect(() => {
-    supabase.from("warehouse").select("id, name").order("name").then(({ data }) => setWarehouses(data ?? []));
+    let cancelled = false;
+    supabase.from("warehouse").select("id, name").order("name").then(({ data }) => {
+      if (!cancelled) setWarehouses(data ?? []);
+    });
     // Fetch pending return requests
     supabase.from("return_request")
       .select("*, customer:customer_id(name), equipment:equipment_id(equipment_no, name), order:order_id(order_no), contract:contract_id(contract_no)")
       .eq("request_status", "PENDING")
       .order("created_at", { ascending: false })
-      .then(({ data }) => setReturnRequests((data ?? []) as unknown as ReturnRequestItem[]));
-  }, []);
+      .then(({ data }) => {
+        if (!cancelled) setReturnRequests((data ?? []) as unknown as ReturnRequestItem[]);
+      });
+    return () => { cancelled = true; };
+  }, [supabase]);
 
-  const searchEquipment = useCallback(async () => {
+  const loadEquipment = useCallback(async () => {
     let q = supabase.from("equipment").select("id, equipment_no, name, status, current_order_id, current_contract_id, current_customer_id")
       .in("status", ["RENTED", "PENDING_INSPECTION", "PENDING_OUTBOUND"]).eq("scrapped", false).order("equipment_no").limit(30);
     if (orderId) q = q.eq("current_order_id", orderId);
@@ -61,9 +67,20 @@ export default function ScanInboundPage() {
     if (equipSearch) q = q.or(`name.ilike.%${equipSearch}%,equipment_no.ilike.%${equipSearch}%`);
     const { data } = await q;
     setEquipment(data ?? []);
-  }, [equipSearch, orderId, contractId]);
+  }, [supabase, equipSearch, orderId, contractId]);
 
-  useEffect(() => { searchEquipment(); }, [searchEquipment, pathname]);
+  useEffect(() => {
+    let cancelled = false;
+    let q = supabase.from("equipment").select("id, equipment_no, name, status, current_order_id, current_contract_id, current_customer_id")
+      .in("status", ["RENTED", "PENDING_INSPECTION", "PENDING_OUTBOUND"]).eq("scrapped", false).order("equipment_no").limit(30);
+    if (orderId) q = q.eq("current_order_id", orderId);
+    if (contractId) q = q.eq("current_contract_id", contractId);
+    if (equipSearch) q = q.or(`name.ilike.%${equipSearch}%,equipment_no.ilike.%${equipSearch}%`);
+    q.then(({ data }) => {
+      if (!cancelled) setEquipment(data ?? []);
+    });
+    return () => { cancelled = true; };
+  }, [supabase, equipSearch, orderId, contractId, pathname]);
 
   async function handleScan(e: React.FormEvent) {
     e.preventDefault();
@@ -85,7 +102,7 @@ export default function ScanInboundPage() {
     if (res.success) {
       setSelectedEquipId(""); setSelectedOrderId(""); setSelectedContractId("");
       setEquipSearch(""); setNotes("");
-      searchEquipment();
+      loadEquipment();
     }
   }
 

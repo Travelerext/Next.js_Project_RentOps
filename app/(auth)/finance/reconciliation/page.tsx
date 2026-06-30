@@ -283,10 +283,6 @@ export default async function ReconciliationPage() {
     0,
   );
   const totalPaidAll = customerSummaries.reduce((s, c) => s + c.total_paid, 0);
-  const totalUnpaidAll = customerSummaries.reduce(
-    (s, c) => s + c.total_unpaid,
-    0,
-  );
   const totalDepositAll = customerSummaries.reduce(
     (s, c) => s + c.deposit_balance,
     0,

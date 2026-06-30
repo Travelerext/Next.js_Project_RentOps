@@ -1,7 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase/client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 
 export interface Notification {
   id: string;
@@ -21,7 +21,7 @@ export interface Notification {
  * Returns unread notifications and a mark-read helper.
  */
 export function useRealtimeNotifications(userId: string | undefined) {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -63,7 +63,7 @@ export function useRealtimeNotifications(userId: string | undefined) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId]);
+  }, [userId, supabase]);
 
   const markAsRead = useCallback(
     async (notificationId: string) => {

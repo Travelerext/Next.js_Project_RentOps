@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ interface Equipment {
 
 export default function NewWorkOrderPage() {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -38,18 +38,18 @@ export default function NewWorkOrderPage() {
   const [affectsConstruction, setAffectsConstruction] = useState(false);
   const [remark, setRemark] = useState("");
 
-  // Search equipment
-  const searchEquipment = useCallback(async () => {
+  useEffect(() => {
+    let cancelled = false;
     let q = supabase.from("equipment")
       .select("id, equipment_no, name, status, brand, specification")
       .eq("scrapped", false).is("deleted_at", null)
       .order("equipment_no").limit(20);
     if (equipSearch) q = q.or(`name.ilike.%${equipSearch}%,equipment_no.ilike.%${equipSearch}%`);
-    const { data } = await q;
-    setEquipmentList((data ?? []) as Equipment[]);
+    q.then(({ data }) => {
+      if (!cancelled) setEquipmentList((data ?? []) as Equipment[]);
+    });
+    return () => { cancelled = true; };
   }, [equipSearch, supabase]);
-
-  useEffect(() => { searchEquipment(); }, [searchEquipment]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

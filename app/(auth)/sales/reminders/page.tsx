@@ -16,7 +16,9 @@ export default async function RemindersPage() {
   const supabase = await createClient();
 
   const today = new Date().toISOString();
-  const sevenDaysLater = new Date(Date.now() + 7 * 86400000).toISOString();
+  const sevenDaysLaterDate = new Date();
+  sevenDaysLaterDate.setDate(sevenDaysLaterDate.getDate() + 7);
+  const sevenDaysLater = sevenDaysLaterDate.toISOString();
 
   const [{ data: expiringOrders }, { data: overdueOrders }] =
     await Promise.all([
@@ -39,7 +41,7 @@ export default async function RemindersPage() {
     ...(overdueOrders ?? []).map((o) => o.id),
   ];
 
-  let itemCountMap: Record<string, number> = {};
+  const itemCountMap: Record<string, number> = {};
   if (orderIds.length > 0) {
     const { data: items } = await supabase
       .from("rental_order_item")

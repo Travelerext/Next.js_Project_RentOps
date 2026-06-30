@@ -13,7 +13,7 @@ import {
   MobileCard,
   MobileRow,
 } from "@/components/ui/table";
-import { Shield, FileKey } from "lucide-react";
+import { Shield } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { createRentalOrder, addOrderItem, submitOrder } from "@/lib/actions/rental-order";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
-import { RISK_LEVELS, CREDIT_LEVELS, EQUIPMENT_STATUS } from "@/lib/constants";
+import { RISK_LEVELS, CREDIT_LEVELS } from "@/lib/constants";
 import {
   ArrowLeft, ArrowRight, Check, Plus, Trash2, AlertTriangle,
   Calculator, ShoppingCart, UserCheck, Wrench, FileText,
@@ -58,13 +58,12 @@ type Step = "customer" | "equipment" | "pricing" | "adjust" | "review";
 export default function NewOrderPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   // ── Step state ────────────────────────────────────────────────────
   const [step, setStep] = useState<Step>("customer");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // ── Customer ──────────────────────────────────────────────────────
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
@@ -88,60 +87,72 @@ export default function NewOrderPage() {
   const [transportFee, setTransportFee] = useState("0");
   const [materialFee, setMaterialFee] = useState("0");
   const [otherFee, setOtherFee] = useState("0");
-  const [pricingResults, setPricingResults] = useState<Record<string, PricingResult>>({});
   const [remark, setRemark] = useState("");
 
   // ── Price adjustment ────────────────────────────────────────────
-  const [adjustReasons, setAdjustReasons] = useState<Record<string, string>>({});
   const [adjustReason, setAdjustReason] = useState("");
 
   // ── Review ────────────────────────────────────────────────────────
   const [draftOrderId, setDraftOrderId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // ── Load customers ────────────────────────────────────────────────
-  const loadCustomers = useCallback(async () => {
+  useEffect(() => {
+    let cancelled = false;
     let q = supabase.from("customer")
       .select("id, name, customer_no, risk_level, is_blacklisted, lock_ordering, credit_level, lock_reason")
       .eq("status", "ACTIVE").is("deleted_at", null).order("name").limit(50);
     if (customerSearch) q = q.or(`name.ilike.%${customerSearch}%,customer_no.ilike.%${customerSearch}%`);
-    const { data } = await q;
-    setCustomers(data ?? []);
-  }, [customerSearch]);
-
-  useEffect(() => { loadCustomers(); }, [loadCustomers]);
+    q.then(({ data }) => {
+      if (!cancelled) setCustomers(data ?? []);
+    });
+    return () => { cancelled = true; };
+  }, [supabase, customerSearch]);
 
   // ── Load categories and available equipment ──────────────────────
   useEffect(() => {
-    supabase.from("equipment_category").select("id, name").order("sort_order").then(({ data }) => setCategories(data ?? []));
-  }, []);
+    let cancelled = false;
+    supabase.from("equipment_category").select("id, name").order("sort_order").then(({ data }) => {
+      if (!cancelled) setCategories(data ?? []);
+    });
+    return () => { cancelled = true; };
+  }, [supabase]);
 
-  const loadAvailableEquipment = useCallback(async () => {
+  useEffect(() => {
+    if (step !== "equipment") return;
+    let cancelled = false;
     let q = supabase.from("equipment")
       .select("id, equipment_no, name, brand, status, standard_rent, standard_deposit, category_id")
       .eq("status", "IN_STOCK").eq("scrapped", false).is("deleted_at", null).order("equipment_no").limit(50);
     if (equipSearch) q = q.or(`name.ilike.%${equipSearch}%,equipment_no.ilike.%${equipSearch}%`);
     if (equipCategoryFilter) q = q.eq("category_id", equipCategoryFilter);
-    const { data } = await q;
-    setAvailableEquipment(data ?? []);
-  }, [equipSearch, equipCategoryFilter]);
-
-  useEffect(() => { if (step === "equipment") loadAvailableEquipment(); }, [step, loadAvailableEquipment]);
+    q.then(({ data }) => {
+      if (!cancelled) setAvailableEquipment(data ?? []);
+    });
+    return () => { cancelled = true; };
+  }, [supabase, step, equipSearch, equipCategoryFilter]);
 
   // ── Customer risk check ───────────────────────────────────────────
   useEffect(() => {
-    if (!selectedCustomer) { setCustomerRisk(null); return; }
+    let cancelled = false;
+    if (!selectedCustomer) {
+      Promise.resolve().then(() => {
+        if (!cancelled) setCustomerRisk(null);
+      });
+      return () => { cancelled = true; };
+    }
     supabase.from("receivable")
       .select("unpaid_amount").eq("customer_id", selectedCustomer.id)
       .in("status", ["UNPAID", "PARTIAL", "OVERDUE"])
       .then(({ data }) => {
+        if (cancelled) return;
         if (!data?.length) { setCustomerRisk(null); return; }
         setCustomerRisk({
           unsettledCount: data.length,
           unsettledAmount: data.reduce((s, r) => s + parseFloat(r.unpaid_amount ?? "0"), 0),
         });
       });
-  }, [selectedCustomer]);
+    return () => { cancelled = true; };
+  }, [supabase, selectedCustomer]);
 
   // ── Preselect customer from URL ───────────────────────────────────
   useEffect(() => {
@@ -151,23 +162,10 @@ export default function NewOrderPage() {
       .select("id, name, customer_no, risk_level, is_blacklisted, lock_ordering, credit_level, lock_reason")
       .eq("id", cid).single()
       .then(({ data }) => { if (data) setSelectedCustomer(data as CustomerOption); });
-  }, []);
+  }, [supabase, searchParams]);
 
-  // ── Pricing calculation (auto) ──────────────────────────────────
-  // Recalculate unit prices from monthly standard when mode changes
-  useEffect(() => {
-    setSelectedEquipment(prev => prev.map(item => {
-      const monthlyStandard = item.standardRent;
-      let convertedPrice = monthlyStandard;
-      if (pricingMode === "DAILY") convertedPrice = monthlyStandard / 30;
-      if (pricingMode === "HOURLY") convertedPrice = monthlyStandard / 30 / 8;
-      return { ...item, unitPrice: Math.round(convertedPrice * 100) / 100, pricingMode };
-    }));
-  }, [pricingMode]);
-
-  // Auto-calculate pricing whenever inputs change
-  useEffect(() => {
-    if (step !== "pricing" && step !== "adjust" && step !== "review") return;
+  const pricingResults = useMemo(() => {
+    if (step !== "pricing" && step !== "adjust" && step !== "review") return {};
     const results: Record<string, PricingResult> = {};
     let startMs = 0, endMs = 0;
     if (plannedStartAt) startMs = new Date(plannedStartAt).getTime();
@@ -193,7 +191,7 @@ export default function NewOrderPage() {
         days: pricingMode === "HOURLY" ? Math.ceil(totalHours) : days,
       };
     }
-    setPricingResults(results);
+    return results;
   }, [selectedEquipment, pricingMode, plannedStartAt, plannedEndAt, step]);
 
   // ── Equipment selection ───────────────────────────────────────────
@@ -220,9 +218,23 @@ export default function NewOrderPage() {
     setSelectedEquipment(prev => prev.map(e => e.equipmentId === id ? { ...e, [field]: value } : e));
   }
 
+  function handlePricingModeChange(nextMode: string) {
+    setPricingMode(nextMode);
+    setSelectedEquipment(prev => prev.map(item => {
+      let convertedPrice = item.standardRent;
+      if (nextMode === "DAILY") convertedPrice = item.standardRent / 30;
+      if (nextMode === "HOURLY") convertedPrice = item.standardRent / 30 / 8;
+      return {
+        ...item,
+        unitPrice: Math.round(convertedPrice * 100) / 100,
+        pricingMode: nextMode,
+      };
+    }));
+  }
+
   // ── Create draft & submit ─────────────────────────────────────────
   async function handleCreateDraft() {
-    setLoading(true); setError(""); setFieldErrors({});
+    setLoading(true); setError("");
     const fd = new FormData();
     if (!selectedCustomer) { setError("请选择客户"); setLoading(false); return; }
     fd.set("pricingMode", pricingMode);
@@ -236,7 +248,6 @@ export default function NewOrderPage() {
     const result = await createRentalOrder(selectedCustomer.id, fd);
     if (!result.success) {
       setError(result.error);
-      if (result.fieldErrors) setFieldErrors(result.fieldErrors as unknown as Record<string, string>);
       setLoading(false);
       return;
     }
@@ -492,7 +503,7 @@ export default function NewOrderPage() {
             <CardHeader><CardTitle className="flex items-center gap-2"><Calculator className="h-5 w-5" />租金计算</CardTitle></CardHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-4">
-                <Select id="pricingMode" label="计费方式" value={pricingMode} onChange={e => setPricingMode(e.target.value)}
+                <Select id="pricingMode" label="计费方式" value={pricingMode} onChange={e => handlePricingModeChange(e.target.value)}
                   options={[
                     {value:"HOURLY",label:"按小时"},{value:"DAILY",label:"按天"},
                     {value:"MONTHLY",label:"按月"},

@@ -32,7 +32,7 @@ interface Props<T> {
 
 export function DataTable<T>({ columns, data, keyExtractor, rowHref, onRowClick, emptyMessage = "暂无数据", loading, rowClassName }: Props<T>) {
   if (loading) return <SkeletonTable />;
-  if (!data.length) return <p className="py-12 text-center text-zinc-500 dark:text-zinc-400">{emptyMessage}</p>;
+  if (!data.length) return <p className="py-12 text-center text-app-muted">{emptyMessage}</p>;
 
   const renderCell = (col: Column<T>, item: T, isFirst: boolean) => {
     let content = col.cell(item);
@@ -41,7 +41,7 @@ export function DataTable<T>({ columns, data, keyExtractor, rowHref, onRowClick,
     }
     // Apply link styling to the first cell — actual navigation is on the row
     if (isFirst && rowHref && !col.shareIdentity) {
-      content = <span className="font-medium text-blue-600 dark:text-blue-400">{content}</span>;
+      content = <span className="font-medium text-app-accent">{content}</span>;
     }
     return content;
   };
@@ -100,3 +100,5 @@ export function DataTable<T>({ columns, data, keyExtractor, rowHref, onRowClick,
 }
 
 function cn(...args: (string | undefined | false | null)[]) { return args.filter(Boolean).join(" "); }
+
+

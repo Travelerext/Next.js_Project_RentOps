@@ -18,15 +18,15 @@ export function EmptyState({
   className,
 }: Props) {
   return (
-    <div className={cn("flex flex-col items-center justify-center py-16 text-center", className)}>
-      <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-100 dark:bg-zinc-800">
-        <Icon className="h-8 w-8 text-zinc-400" aria-hidden="true" />
+    <div className={cn("surface-panel flex flex-col items-center justify-center rounded-lg py-16 text-center", className)}>
+      <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-lg bg-app-surface-muted">
+        <Icon className="h-7 w-7 text-app-muted" aria-hidden="true" />
       </div>
-      <h3 className="text-base font-semibold text-zinc-700 dark:text-zinc-300">
+      <h3 className="text-base font-semibold text-app-muted-strong">
         {title}
       </h3>
       {description && (
-        <p className="mt-1 max-w-sm text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mt-1 max-w-sm text-sm leading-6 text-app-muted">
           {description}
         </p>
       )}
@@ -34,3 +34,5 @@ export function EmptyState({
     </div>
   );
 }
+
+

@@ -16,13 +16,6 @@ const TYPE_LABELS: Record<string, string> = {
   CONTRACT_CHANGE: "合同变更", OTHER: "其他",
 };
 
-const STATUS_VARIANT: Record<string, "success" | "warning" | "danger" | "info" | "default"> = {
-  SUBMITTED: "warning", IN_PROGRESS: "info", APPROVED: "success", REJECTED: "danger",
-};
-const STATUS_LABELS: Record<string, string> = {
-  SUBMITTED: "待审批", IN_PROGRESS: "审批中", APPROVED: "已通过", REJECTED: "已拒绝",
-};
-
 export default async function PendingApprovalsPage() {
   const supabase = await createClient();
 
@@ -43,7 +36,7 @@ export default async function PendingApprovalsPage() {
   // Fetch both in parallel
   const [
     { data: approvalData },
-    { data: returnData, error: returnError },
+    { data: returnData },
   ] = await Promise.all([
     supabase.from("approval_request")
       .select("*, applicant:applicant_id(display_name)")

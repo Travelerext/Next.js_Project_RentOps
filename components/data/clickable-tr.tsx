@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Tr } from "@/components/ui/table";
-import type { ReactNode, MouseEvent } from "react";
+import type { ReactNode } from "react";
 
 interface ClickableTrProps {
   href?: string;

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DashboardPage } from "@/components/data/dashboard-page";
 import { StatsGrid } from "@/components/data/stats-grid";
 import { StatCard } from "@/components/data/stat-card";
+import { QuickActionCard } from "@/components/data/quick-action-card";
 import { DataTable, type Column } from "@/components/data/data-table";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -113,11 +114,11 @@ const statusColumns: Column<StatusLogEntry>[] = [
     header: "设备",
     cell: (log) => (
       <>
-        <span className="font-medium text-zinc-900 dark:text-zinc-100">
+        <span className="font-medium text-app-fg">
           {log.equipment?.name ?? "-"}
         </span>
         {log.equipment?.equipment_no && (
-          <span className="ml-1.5 text-xs text-zinc-400">
+          <span className="ml-1.5 text-xs text-app-muted">
             {log.equipment.equipment_no}
           </span>
         )}
@@ -136,7 +137,7 @@ const statusColumns: Column<StatusLogEntry>[] = [
             log.from_status ??
             "初始化"}
         </Badge>
-        <ArrowRight className="h-3 w-3 shrink-0 text-zinc-400" />
+        <ArrowRight className="h-3 w-3 shrink-0 text-app-muted" />
         <Badge variant={statusVariant[log.to_status] ?? "default"}>
           {EQUIPMENT_STATUS[log.to_status] ?? log.to_status}
         </Badge>
@@ -147,7 +148,7 @@ const statusColumns: Column<StatusLogEntry>[] = [
     id: "business_type",
     header: "业务类型",
     cell: (log) => (
-      <span className="text-xs text-zinc-500">
+      <span className="text-xs text-app-muted">
         {BUSINESS_TYPE_LABEL[log.business_type] ?? log.business_type}
       </span>
     ),
@@ -157,80 +158,11 @@ const statusColumns: Column<StatusLogEntry>[] = [
     id: "changed_at",
     header: "时间",
     cell: (log) => (
-      <span className="text-zinc-500">{formatDate(log.changed_at)}</span>
+      <span className="text-app-muted">{formatDate(log.changed_at)}</span>
     ),
     hideOnMobile: true,
   },
 ];
-
-// ─── Shared: Quick-action card component ────────────────────────────
-
-function QuickActionCard({
-  icon: Icon,
-  title,
-  description,
-  href,
-  color = "blue",
-  badge,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  description: string;
-  href: string;
-  color?: "blue" | "emerald" | "indigo" | "purple" | "red" | "amber";
-  badge?: React.ReactNode;
-}) {
-  const palette: Record<
-    string,
-    { bg: string; icon: string }
-  > = {
-    blue: {
-      bg: "bg-blue-100 dark:bg-blue-900/30",
-      icon: "text-blue-600 dark:text-blue-400",
-    },
-    emerald: {
-      bg: "bg-emerald-100 dark:bg-emerald-900/30",
-      icon: "text-emerald-600 dark:text-emerald-400",
-    },
-    indigo: {
-      bg: "bg-indigo-100 dark:bg-indigo-900/30",
-      icon: "text-indigo-600 dark:text-indigo-400",
-    },
-    purple: {
-      bg: "bg-purple-100 dark:bg-purple-900/30",
-      icon: "text-purple-600 dark:text-purple-400",
-    },
-    red: {
-      bg: "bg-red-100 dark:bg-red-900/30",
-      icon: "text-red-600 dark:text-red-400",
-    },
-    amber: {
-      bg: "bg-amber-100 dark:bg-amber-900/30",
-      icon: "text-amber-600 dark:text-amber-400",
-    },
-  };
-  const c = palette[color];
-  return (
-    <Link href={href}>
-      <Card className="cursor-pointer transition-shadow hover:shadow-md h-full">
-        <CardHeader>
-          <div className="flex items-center gap-3">
-            <div
-              className={`flex h-10 w-10 items-center justify-center rounded-lg ${c.bg}`}
-            >
-              <Icon className={`h-5 w-5 ${c.icon}`} />
-            </div>
-            <CardTitle className="flex items-center gap-2">
-              {title}
-              {badge}
-            </CardTitle>
-          </div>
-        </CardHeader>
-        <p className="px-6 pb-4 text-sm text-zinc-500">{description}</p>
-      </Card>
-    </Link>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════════
 //  EQUIPMENT_SUPERVISOR VIEW
@@ -388,11 +320,11 @@ async function SupervisorView() {
       header: "设备",
       cell: (t) => (
         <>
-          <span className="font-medium text-zinc-900 dark:text-zinc-100">
+          <span className="font-medium text-app-fg">
             {t.equipment?.name ?? "-"}
           </span>
           {t.equipment?.equipment_no && (
-            <span className="ml-1.5 text-xs text-zinc-400">
+            <span className="ml-1.5 text-xs text-app-muted">
               {t.equipment.equipment_no}
             </span>
           )}
@@ -403,7 +335,7 @@ async function SupervisorView() {
       id: "from_to",
       header: "调拨方向",
       cell: (t) => (
-        <div className="flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400">
+        <div className="flex items-center gap-1.5 text-xs text-app-muted-strong">
           <span>{t.from_location}</span>
           <ArrowRight className="h-3 w-3 shrink-0" />
           <span>{t.to_location}</span>
@@ -426,7 +358,7 @@ async function SupervisorView() {
       id: "created_at",
       header: "创建时间",
       cell: (t) => (
-        <span className="text-xs text-zinc-500">
+        <span className="text-xs text-app-muted">
           {formatDate(t.created_at)}
         </span>
       ),
@@ -442,11 +374,11 @@ async function SupervisorView() {
       header: "设备",
       cell: (a) => (
         <>
-          <span className="font-medium text-zinc-900 dark:text-zinc-100">
+          <span className="font-medium text-app-fg">
             {a.equipment_name}
           </span>
           {a.equipment_no && (
-            <span className="ml-1.5 text-xs text-zinc-400">
+            <span className="ml-1.5 text-xs text-app-muted">
               {a.equipment_no}
             </span>
           )}
@@ -458,8 +390,8 @@ async function SupervisorView() {
       header: "申请人",
       cell: (a) => (
         <div className="flex items-center gap-1.5">
-          <User className="h-3.5 w-3.5 text-zinc-400" />
-          <span className="text-sm text-zinc-700 dark:text-zinc-300">
+          <User className="h-3.5 w-3.5 text-app-muted" />
+          <span className="text-sm text-app-muted-strong">
             {a.applicant_name}
           </span>
         </div>
@@ -471,8 +403,8 @@ async function SupervisorView() {
       header: "提交时间",
       cell: (a) => (
         <div className="flex items-center gap-1.5">
-          <Calendar className="h-3.5 w-3.5 text-zinc-400" />
-          <span className="text-xs text-zinc-500">
+          <Calendar className="h-3.5 w-3.5 text-app-muted" />
+          <span className="text-xs text-app-muted">
             {formatDateTime(a.submitted_at)}
           </span>
         </div>
@@ -538,7 +470,7 @@ async function SupervisorView() {
           value={`${utilizationPct}%`}
           color="blue"
         >
-          <p className="text-xs text-zinc-400">
+          <p className="text-xs text-app-muted">
             已租出 {rented} / {total} 台
           </p>
         </StatCard>
@@ -570,7 +502,7 @@ async function SupervisorView() {
             <CardTitle>
               <ClipboardList className="inline h-4 w-4 mr-1.5" />
               报废审批待处理
-              <span className="ml-2 text-xs font-normal text-zinc-400">
+              <span className="ml-2 text-xs font-normal text-app-muted">
                 ({scrapApprovalRows.length} 条)
               </span>
             </CardTitle>
@@ -597,7 +529,7 @@ async function SupervisorView() {
             <CardTitle>
               <Truck className="inline h-4 w-4 mr-1.5" />
               调拨监控
-              <span className="ml-2 text-xs font-normal text-zinc-400">
+              <span className="ml-2 text-xs font-normal text-app-muted">
                 ({transfers.length} 条)
               </span>
             </CardTitle>
@@ -624,7 +556,7 @@ async function SupervisorView() {
             <CardTitle>
               <Clock className="inline h-4 w-4 mr-1.5" />
               设备状态变更日志
-              <span className="ml-2 text-xs font-normal text-zinc-400">
+              <span className="ml-2 text-xs font-normal text-app-muted">
                 (最近 15 条)
               </span>
             </CardTitle>
@@ -636,7 +568,7 @@ async function SupervisorView() {
             rowHref={(log) => `/equipment/catalog/${log.equipment_id}`}
             emptyMessage="暂无状态变更记录"
           />
-          <div className="border-t border-zinc-200 dark:border-zinc-700 px-4 py-3">
+          <div className="border-t border-app-border px-4 py-3">
             <Link href="/equipment/catalog">
               <Button variant="ghost" size="sm">
                 查看完整设备台账 →
@@ -653,35 +585,35 @@ async function SupervisorView() {
           title="设备台账"
           description="查看和管理所有设备档案信息"
           href="/equipment/catalog"
-          color="blue"
+          tone="accent"
         />
         <QuickActionCard
           icon={ArrowRightFromLine}
           title="扫码出库"
           description="扫描设备条码，完成出库操作"
           href="/equipment/scan/outbound"
-          color="emerald"
+          tone="success"
         />
         <QuickActionCard
           icon={ArrowLeftToLine}
           title="扫码入库"
           description="扫描设备条码，完成入库验收"
           href="/equipment/scan/inbound"
-          color="indigo"
+          tone="info"
         />
         <QuickActionCard
           icon={Truck}
           title="调拨管理"
           description="设备调拨列表与详情"
           href="/equipment/transfers"
-          color="purple"
+          tone="info"
         />
         <QuickActionCard
           icon={ClipboardList}
           title="报废审批"
           description="处理设备报废申请和审批"
           href="/approval?type=SCRAP"
-          color="red"
+          tone="danger"
           badge={
             (scrapPendingCount ?? 0) > 0 ? (
               <Badge variant="danger" pulse>
@@ -800,7 +732,7 @@ async function ManagerView() {
             <CardTitle>
               <Clock className="inline h-4 w-4 mr-1.5" />
               最近状态变更
-              <span className="ml-2 text-xs font-normal text-zinc-400">
+              <span className="ml-2 text-xs font-normal text-app-muted">
                 (最近 10 条)
               </span>
             </CardTitle>
@@ -812,7 +744,7 @@ async function ManagerView() {
             rowHref={(log) => `/equipment/catalog/${log.equipment_id}`}
             emptyMessage="暂无状态变更记录"
           />
-          <div className="border-t border-zinc-200 dark:border-zinc-700 px-4 py-3">
+          <div className="border-t border-app-border px-4 py-3">
             <Link href="/equipment/catalog">
               <Button variant="ghost" size="sm">
                 查看完整设备台账 →
@@ -829,28 +761,28 @@ async function ManagerView() {
           title="设备台账"
           description="查看和管理所有设备档案信息"
           href="/equipment/catalog"
-          color="blue"
+          tone="accent"
         />
         <QuickActionCard
           icon={ArrowRightFromLine}
           title="扫码出库"
           description="扫描设备条码，完成出库操作"
           href="/equipment/scan/outbound"
-          color="emerald"
+          tone="success"
         />
         <QuickActionCard
           icon={ArrowLeftToLine}
           title="扫码入库"
           description="扫描设备条码，完成入库验收"
           href="/equipment/scan/inbound"
-          color="indigo"
+          tone="info"
         />
         <QuickActionCard
           icon={Truck}
           title="调拨管理"
           description="设备调拨列表与详情"
           href="/equipment/transfers"
-          color="purple"
+          tone="info"
         />
       </div>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -859,7 +791,7 @@ async function ManagerView() {
           title="新增设备"
           description="登记新设备信息，录入设备档案"
           href="/equipment/catalog/new"
-          color="emerald"
+          tone="success"
         />
       </div>
     </DashboardPage>
@@ -880,7 +812,7 @@ export default async function EquipmentDashboardPage() {
         title="设备管理"
         subtitle="设备资产全生命周期概览"
       >
-        <p className="py-12 text-center text-zinc-500 dark:text-zinc-400">
+        <p className="py-12 text-center text-app-muted">
           请先登录
         </p>
       </DashboardPage>

@@ -5,8 +5,8 @@ import { StatCard } from "@/components/data/stat-card";
 import { DataTable, type Column } from "@/components/data/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency, formatDate, formatCompactCurrency } from "@/lib/utils";
-import { ORDER_STATUS, CONTRACT_STATUS, ORDER_STATUS_VARIANTS, CONTRACT_STATUS_VARIANTS } from "@/lib/constants";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import { ORDER_STATUS, ORDER_STATUS_VARIANTS } from "@/lib/constants";
 import Link from "next/link";
 import {
   Users, FileText, AlertTriangle, TrendingUp, ArrowRight,
@@ -19,7 +19,6 @@ export default async function SalesDashboardPage() {
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const sevenDaysLater = new Date(now.getTime() + 7 * 86400000);
   const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
 
   const [
     { count: customerCount },
@@ -94,10 +93,6 @@ export default async function SalesDashboardPage() {
   /** Safely resolve badge variant from order status */
   const orderBadgeVariant = (status: string): "default" | "success" | "warning" | "danger" | "info" =>
     (ORDER_STATUS_VARIANTS[status] as "default" | "success" | "warning" | "danger" | "info") ?? "default";
-
-  /** Safely resolve badge variant from contract status */
-  const contractBadgeVariant = (status: string): "default" | "success" | "warning" | "danger" | "info" =>
-    (CONTRACT_STATUS_VARIANTS[status] as "default" | "success" | "warning" | "danger" | "info") ?? "default";
 
   // ── Render ─────────────────────────────────────────────────────────────
 

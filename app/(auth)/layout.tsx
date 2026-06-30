@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AuthShell } from "@/components/layout/auth-shell";
-import { ROLE_DASHBOARD_MAP } from "@/lib/constants";
 
 // Map primary_role to dashboard name for the sidebar
 const ROLE_TO_DASHBOARD: Record<string, string> = {

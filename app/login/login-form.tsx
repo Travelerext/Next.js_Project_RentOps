@@ -2,10 +2,10 @@
 
 import { useActionState, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { login, signup, type LoginState, type SignupState } from "@/lib/actions/auth";
+import { login, signup } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Truck, Loader2 } from "lucide-react";
+import { HardHat, Loader2, Sparkles } from "lucide-react";
 
 export function LoginForm() {
   const router = useRouter();
@@ -15,7 +15,6 @@ export function LoginForm() {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [loginState, loginAction, loginPending] = useActionState(login, null);
   const [signupState, signupAction, signupPending] = useActionState(signup, null);
-  const [signupSuccess, setSignupSuccess] = useState(false);
 
   // Handle login success — redirect
   useEffect(() => {
@@ -29,33 +28,54 @@ export function LoginForm() {
   // Handle signup success — show message then switch to login
   useEffect(() => {
     if (signupState?.success) {
-      setSignupSuccess(true);
       const timer = setTimeout(() => {
         setMode("login");
-        setSignupSuccess(false);
       }, 3000);
       return () => clearTimeout(timer);
     }
   }, [signupState]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 p-4 dark:from-zinc-950 dark:to-zinc-900">
-      <div className="w-full max-w-md animate-fade-in">
-        {/* Logo */}
-        <div className="mb-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 shadow-lg shadow-blue-200 dark:shadow-blue-900/30 mb-4">
-            <Truck className="h-7 w-7 text-white" />
+    <div className="app-page-shell premium-page-bg flex min-h-dvh items-center justify-center overflow-hidden p-4">
+      <div className="app-page-content grid w-full max-w-5xl animate-fade-in gap-6 lg:grid-cols-[minmax(0,1fr)_440px] lg:items-center">
+        <section className="hidden min-w-0 lg:block">
+          <div className="inline-flex items-center gap-2 rounded-full border border-app-border bg-app-surface/72 px-3 py-1.5 text-xs font-semibold text-app-accent shadow-sm backdrop-blur-xl">
+            <Sparkles className="h-3.5 w-3.5" />
+            RentOps Intelligence Suite
           </div>
-          <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 text-pretty">
-            设备租赁管理系统
+          <h1 className="mt-5 max-w-xl text-5xl font-semibold leading-tight tracking-normal text-app-fg text-pretty">
+            机械租赁运营，从资产到现金流一屏掌控。
           </h1>
-          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-            {mode === "login" ? "登录您的账号以继续" : "创建新账号"}
+          <p className="mt-5 max-w-lg text-base leading-7 text-app-muted">
+            为销售、设备、财务、维修和审批角色提供统一的业务工作台。
           </p>
-        </div>
+          <div className="mt-8 grid max-w-lg grid-cols-3 gap-3">
+            {["订单", "设备", "回款"].map((item) => (
+              <div key={item} className="surface-panel rounded-lg p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-app-muted">{item}</p>
+                <p className="mt-2 text-2xl font-semibold text-app-fg">Live</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div className="w-full max-w-md justify-self-center lg:max-w-none">
+          <div className="mb-6 flex items-center justify-center gap-3 text-center lg:justify-start">
+            <div className="brand-mark flex h-12 w-12 items-center justify-center rounded-lg">
+              <HardHat className="h-6 w-6 text-app-accent-contrast" />
+            </div>
+            <div className="text-left">
+              <h2 className="text-xl font-semibold text-app-fg text-pretty">
+                RentOps
+              </h2>
+              <p className="mt-0.5 text-sm text-app-muted">
+                {mode === "login" ? "欢迎回来" : "创建新账号"}
+              </p>
+            </div>
+          </div>
 
         {/* Form card */}
-        <div className="rounded-2xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/80">
+        <div className="surface-panel-elevated rounded-lg p-5 md:p-6">
           {mode === "login" ? (
             <form action={loginAction} className="space-y-4">
               <Input
@@ -79,7 +99,7 @@ export function LoginForm() {
               {paramRedirect && <input type="hidden" name="redirect" value={paramRedirect} />}
 
               {loginState?.error && (
-                <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400 animate-fade-in" role="alert">
+                <div className="animate-fade-in rounded-lg bg-app-danger-soft p-3 text-sm text-app-danger" role="alert">
                   {loginState.error}
                 </div>
               )}
@@ -95,12 +115,12 @@ export function LoginForm() {
                 )}
               </Button>
 
-              <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-center text-sm text-app-muted">
                 还没有账号？{" "}
                 <button
                   type="button"
                   onClick={() => setMode("signup")}
-                  className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                  className="font-medium text-app-accent hover:underline"
                 >
                   注册
                 </button>
@@ -137,12 +157,12 @@ export function LoginForm() {
               />
 
               {signupState?.error && (
-                <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400 animate-fade-in" role="alert">
+                <div className="animate-fade-in rounded-lg bg-app-danger-soft p-3 text-sm text-app-danger" role="alert">
                   {signupState.error}
                 </div>
               )}
-              {signupSuccess && signupState?.message && (
-                <div className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 animate-fade-in">
+              {signupState?.success && signupState?.message && (
+                <div className="animate-fade-in rounded-lg bg-app-success-soft p-3 text-sm text-app-success">
                   {signupState.message}
                 </div>
               )}
@@ -158,12 +178,12 @@ export function LoginForm() {
                 )}
               </Button>
 
-              <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="text-center text-sm text-app-muted">
                 已有账号？{" "}
                 <button
                   type="button"
                   onClick={() => setMode("login")}
-                  className="font-medium text-blue-600 hover:underline dark:text-blue-400"
+                  className="font-medium text-app-accent hover:underline"
                 >
                   去登录
                 </button>
@@ -172,10 +192,13 @@ export function LoginForm() {
           )}
         </div>
 
-        <p className="mt-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
+        <p className="mt-6 text-center text-xs text-app-muted">
           RentOps v0.1 · 机械设备租赁管理平台
         </p>
+        </div>
       </div>
     </div>
   );
 }
+
+

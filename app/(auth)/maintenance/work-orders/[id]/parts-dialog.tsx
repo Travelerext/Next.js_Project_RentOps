@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useSparePart } from "@/lib/actions/maintenance";
+import { useSparePart as consumeSparePartAction } from "@/lib/actions/maintenance";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency } from "@/lib/utils";
 import { Search, Package, AlertTriangle, Loader2 } from "lucide-react";
@@ -32,20 +32,33 @@ export function PartsDialog({ workOrderId, open, onOpenChange }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
-  const loadParts = useCallback(async () => {
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      setError("");
+      setSelectedPart(null);
+      setQuantity("1");
+      setSearch("");
+    });
+    return () => { cancelled = true; };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
     let q = supabase.from("spare_part")
       .select("id, part_no, part_name, specification, current_stock, safety_stock, unit, unit_price")
       .eq("status", "ACTIVE").order("part_no").limit(50);
     if (search) q = q.or(`part_no.ilike.%${search}%,part_name.ilike.%${search}%`);
-    const { data } = await q;
-    setParts((data ?? []) as PartOption[]);
-  }, [search, supabase]);
-
-  useEffect(() => {
-    if (open) { loadParts(); setError(""); setSelectedPart(null); setQuantity("1"); setSearch(""); }
-  }, [open, loadParts]);
+    q.then(({ data }) => {
+      if (!cancelled) setParts((data ?? []) as PartOption[]);
+    });
+    return () => { cancelled = true; };
+  }, [open, search, supabase]);
 
   async function handleConfirm() {
     if (!selectedPart) { setError("请选择配件"); return; }
@@ -58,7 +71,7 @@ export function PartsDialog({ workOrderId, open, onOpenChange }: Props) {
     const fd = new FormData();
     fd.set("partId", selectedPart.id);
     fd.set("quantity", quantity);
-    const result = await useSparePart(workOrderId, fd);
+    const result = await consumeSparePartAction(workOrderId, fd);
     if (result.success) {
       onOpenChange(false);
       router.refresh();

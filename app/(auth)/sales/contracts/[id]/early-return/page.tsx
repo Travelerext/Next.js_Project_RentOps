@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,6 @@ import {
   Calendar,
   Loader2,
   CheckCircle,
-  XCircle,
   AlertTriangle,
   ArrowLeft,
   Package,
@@ -44,12 +43,30 @@ interface ContractItem {
   rent_amount: string;
 }
 
+function calculateRemainingDays(endAt: string, fromDate: string): number {
+  const endDate = new Date(endAt);
+  const baseDate = fromDate ? new Date(fromDate) : new Date();
+  return Math.max(0, Math.ceil((endDate.getTime() - baseDate.getTime()) / (1000 * 60 * 60 * 24)));
+}
+
+function calculateEstimatedPenalty(contract: ContractData | null, fromDate: string): number {
+  if (!contract?.end_at) return 0;
+  const remainingDays = calculateRemainingDays(contract.end_at, fromDate);
+  const dailyRent = parseFloat(contract.total_rent_amount) > 0
+    ? parseFloat(contract.total_rent_amount) / 30
+    : 0;
+  const penaltyRate = contract.penalty_rule
+    ? (parseFloat(String((contract.penalty_rule as Record<string, unknown>).rate ?? "20")) / 100)
+    : 0.2;
+  return dailyRent * remainingDays * penaltyRate;
+}
+
 // ─── Component ──────────────────────────────────────────────────────────
 
 export default function EarlyReturnPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [contract, setContract] = useState<ContractData | null>(null);
   const [items, setItems] = useState<ContractItem[]>([]);
@@ -63,9 +80,6 @@ export default function EarlyReturnPage() {
   const [returnAll, setReturnAll] = useState(true);
   const [reason, setReason] = useState("");
   const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-
-  // Derived
-  const [estimatedPenalty, setEstimatedPenalty] = useState(0);
 
   useEffect(() => {
     async function fetchData() {
@@ -98,30 +112,16 @@ export default function EarlyReturnPage() {
       setItems(contractItems);
       setSelectedItems(new Set(contractItems.map((i) => i.id)));
 
-      // Calculate estimated penalty
-      if (c.end_at) {
-        const endDate = new Date(c.end_at);
-        const remainingDays = Math.max(0, Math.ceil((endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)));
-        const dailyRent = parseFloat(c.total_rent_amount) > 0
-          ? parseFloat(c.total_rent_amount) / 30
-          : 0;
-        const penaltyRate = c.penalty_rule
-          ? (parseFloat(String((c.penalty_rule as Record<string, unknown>).rate ?? "20")) / 100)
-          : 0.2;
-        setEstimatedPenalty(dailyRent * remainingDays * penaltyRate);
-      }
-
       setLoading(false);
     }
 
     fetchData();
-  }, [id]);
+  }, [id, supabase]);
 
   // ── Calculate remaining days ──────────────────────────────────────────
 
-  const remainingDays = contract?.end_at
-    ? Math.max(0, Math.ceil((new Date(contract.end_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
-    : 0;
+  const remainingDays = contract?.end_at ? calculateRemainingDays(contract.end_at, earlyReturnDate) : 0;
+  const estimatedPenalty = calculateEstimatedPenalty(contract, earlyReturnDate);
 
   // ── Handle submit ─────────────────────────────────────────────────────
 

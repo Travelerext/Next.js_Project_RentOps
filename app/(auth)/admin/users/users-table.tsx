@@ -214,7 +214,7 @@ export function UsersTable({ profiles, adminProfileId }: UsersTableProps) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1 max-w-sm">
           <svg
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400"
+            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-muted"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -232,13 +232,13 @@ export function UsersTable({ profiles, adminProfileId }: UsersTableProps) {
             placeholder="搜索用户名、姓名、手机号… (Ctrl+K)"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex h-10 w-full rounded-lg border border-zinc-300 bg-white pl-10 pr-3 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+            className="focus-ring premium-control flex h-10 w-full rounded-lg border border-app-border pl-10 pr-3 text-sm text-app-fg placeholder:text-app-muted transition-[border-color,box-shadow] focus:border-app-accent"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-app-muted transition-colors hover:text-app-fg"
             >
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -246,9 +246,9 @@ export function UsersTable({ profiles, adminProfileId }: UsersTableProps) {
             </button>
           )}
         </div>
-        <span className="text-sm text-zinc-500 dark:text-zinc-400">
+        <span className="text-sm text-app-muted">
           共{" "}
-          <span className="font-medium text-zinc-900 dark:text-zinc-100">
+          <span className="font-medium text-app-fg">
             {filteredProfiles.length}
           </span>
           {" "}个用户
@@ -275,7 +275,7 @@ export function UsersTable({ profiles, adminProfileId }: UsersTableProps) {
 
       {/* ═══ Table ═══ */}
       {filteredProfiles.length === 0 ? (
-        <div className="rounded-lg border border-zinc-200 p-12 text-center text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+        <div className="surface-panel rounded-lg p-12 text-center text-app-muted">
           {searchQuery ? "没有匹配的用户" : "暂无用户数据"}
         </div>
       ) : (
@@ -302,7 +302,7 @@ export function UsersTable({ profiles, adminProfileId }: UsersTableProps) {
                   <TableCell className="font-medium">
                     {p.username}
                     {isSelf && (
-                      <span className="ml-1.5 text-xs text-zinc-400">
+                      <span className="ml-1.5 text-xs text-app-muted">
                         (当前用户)
                       </span>
                     )}
@@ -327,7 +327,7 @@ export function UsersTable({ profiles, adminProfileId }: UsersTableProps) {
                     />
                   </TableCell>
 
-                  <TableCell className="text-sm text-zinc-500">
+                  <TableCell className="text-sm text-app-muted">
                     {formatDate(p.created_at)}
                   </TableCell>
 
@@ -382,14 +382,14 @@ export function UsersTable({ profiles, adminProfileId }: UsersTableProps) {
             return (
               <MobileCard key={p.id}>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-zinc-900 dark:text-zinc-100">{p.username}{isSelf && <span className="ml-1 text-xs text-zinc-400">(当前用户)</span>}</span>
+                  <span className="font-medium text-app-fg">{p.username}{isSelf && <span className="ml-1 text-xs text-app-muted">(当前用户)</span>}</span>
                   <StatusBadge status={p.account_status} loginEnabled={p.login_enabled} />
                 </div>
                 <MobileCardRow label="姓名">{p.display_name}</MobileCardRow>
                 <MobileCardRow label="角色">{ROLE_LABELS[p.primary_role ?? ""] ?? p.primary_role ?? "未分配"}</MobileCardRow>
                 <MobileCardRow label="类型"><AccountTypeLabel type={p.account_type} /></MobileCardRow>
                 <MobileCardRow label="创建时间">{formatDate(p.created_at)}</MobileCardRow>
-                <div className="flex items-center gap-1 mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700">
+                <div className="mt-3 flex items-center gap-1 border-t border-app-border pt-3">
                   <Button variant="outline" size="sm" disabled={isBusy} onClick={() => setDialog({ type: "edit", profile: p })}>编辑</Button>
                   {!isSelf && <StatusActionButtons profile={p} disabled={isBusy} onAction={(action) => setDialog({ type: "confirmStatus", profile: p, action })} />}
                   <Button variant="destructive" size="sm" disabled={isSelf || isBusy} onClick={() => setDialog({ type: "confirmDelete", profile: p })}>删除</Button>

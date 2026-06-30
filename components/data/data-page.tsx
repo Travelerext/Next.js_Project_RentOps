@@ -1,10 +1,12 @@
 import { ViewTransition } from "react";
 import { DirectionalTransition } from "@/components/layout/directional-transition";
 import { Pagination } from "@/components/data/pagination";
+import { PageHeader } from "@/components/layout/page-header";
+import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonPage } from "@/components/ui/skeleton";
 import Link from "next/link";
-import { Plus, Search, X } from "lucide-react";
-import type { ReactNode, ComponentProps } from "react";
+import { Plus, Search } from "lucide-react";
+import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -26,27 +28,20 @@ interface Props {
 
 export function DataPage(p: Props) {
   const body = p.error
-    ? <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center dark:border-red-800 dark:bg-red-900/20"><p className="font-medium text-red-600 dark:text-red-400">数据加载失败</p><p className="mt-1 text-sm text-red-500">{p.error}</p></div>
+    ? <div className="surface-panel rounded-lg bg-app-danger-soft p-8 text-center"><p className="font-medium text-app-danger">数据加载失败</p><p className="mt-1 text-sm text-app-danger">{p.error}</p></div>
     : p.loading ? <SkeletonPage />
-    : p.empty ? <p className="py-12 text-center text-zinc-500 dark:text-zinc-400">{p.emptyMessage ?? "暂无数据"}</p>
+    : p.empty ? <EmptyState title={p.emptyMessage ?? "暂无数据"} />
     : <>{p.children}</>;
 
   return (
     <DirectionalTransition>
       <ViewTransition enter="slide-up" default="none">
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold text-zinc-900 dark:text-zinc-100 text-pretty">{p.title}</h1>
-              {p.subtitle && <p className="text-sm text-zinc-500 mt-1">{p.subtitle}</p>}
-            </div>
-            {p.actions && <div className="flex items-center gap-2 shrink-0">{p.actions}</div>}
-          </div>
+        <div className="space-y-7">
+          <PageHeader title={p.title} subtitle={p.subtitle} actions={p.actions} />
 
           {/* Search + Filters */}
           {(p.search || p.filters) ? (
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="surface-panel flex flex-col gap-3 rounded-lg p-2.5 sm:flex-row sm:items-center sm:justify-between">
               {p.search ? <SearchInput {...p.search} /> : null}
               {p.filters ? <FilterTabs items={p.filters.items} activeKey={p.filters.activeKey} /> : null}
             </div>
@@ -72,9 +67,9 @@ function SearchInput({ placeholder = "搜索…", defaultValue = "", paramName =
   return (
     <form method="GET" className="w-full sm:max-w-sm">
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-app-muted" aria-hidden="true" />
         <input name={paramName} defaultValue={defaultValue} placeholder={placeholder}
-          className="flex h-10 w-full rounded-lg border border-zinc-300 bg-white pl-10 pr-4 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500" />
+          className="focus-ring premium-control flex h-10 w-full rounded-lg border border-app-border pl-10 pr-4 text-sm text-app-fg placeholder:text-app-muted transition-[border-color,box-shadow] focus:border-app-accent" />
       </div>
     </form>
   );
@@ -84,10 +79,10 @@ function SearchInput({ placeholder = "搜索…", defaultValue = "", paramName =
 
 function FilterTabs({ items, activeKey }: { items: FilterTab[]; activeKey: string }) {
   return (
-    <div className="flex gap-1.5 overflow-x-auto scroll-snap-x pb-1">
+    <div className="scroll-snap-x flex gap-1 overflow-x-auto rounded-lg border border-app-border bg-app-surface/72 p-1">
       {items.map(tab => (
         <Link key={tab.key} href={tab.href} scroll={false}
-          className={`shrink-0 scroll-snap-start rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${tab.key === activeKey ? "bg-blue-600 text-white" : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"}`}
+          className={`scroll-snap-start shrink-0 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${tab.key === activeKey ? "bg-app-surface text-app-accent shadow-sm" : "text-app-muted-strong hover:bg-app-surface/70 hover:text-app-fg"}`}
           aria-current={tab.key === activeKey ? "page" : undefined}>{tab.label}</Link>
       ))}
     </div>
@@ -98,8 +93,10 @@ function FilterTabs({ items, activeKey }: { items: FilterTab[]; activeKey: strin
 
 function FabLink({ href, label, icon: Icon = Plus }: { href: string; label: string; icon?: LucideIcon }) {
   return (
-    <Link href={href} className="md:hidden fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700 active:scale-95 transition-transform transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2" aria-label={label}>
+    <Link href={href} className="focus-ring fixed bottom-20 right-4 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-app-accent text-app-accent-contrast shadow-[var(--shadow-md)] transition-[background-color,transform] hover:bg-app-accent-hover active:scale-95 md:hidden" aria-label={label}>
       <Icon className="h-6 w-6" />
     </Link>
   );
 }
+
+

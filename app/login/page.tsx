@@ -4,11 +4,13 @@ import { LoginForm } from "./login-form";
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <div className="text-sm text-zinc-500">加载中...</div>
+      <div className="flex min-h-dvh items-center justify-center bg-app-bg">
+        <div className="text-sm text-app-muted">加载中...</div>
       </div>
     }>
       <LoginForm />
     </Suspense>
   );
 }
+
+

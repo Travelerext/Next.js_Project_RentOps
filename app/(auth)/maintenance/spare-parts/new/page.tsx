@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
 import { createSparePart } from "@/lib/actions/maintenance";
 import { createClient } from "@/lib/supabase/client";
 import { PageHeader } from "@/components/layout/page-header";
@@ -34,7 +33,7 @@ const UNIT_OPTIONS = [
 
 export default function NewSparePartPage() {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -59,30 +58,30 @@ export default function NewSparePartPage() {
   const [whList, setWhList] = useState<WarehouseOption[]>([]);
   const [selectedWh, setSelectedWh] = useState<WarehouseOption | null>(null);
 
-  // Search equipment models
-  const searchModels = useCallback(async () => {
+  useEffect(() => {
+    let cancelled = false;
     let q = supabase.from("equipment_model")
       .select("id, model_name, brand")
       .order("model_name").limit(20);
     if (modelSearch) q = q.ilike("model_name", `%${modelSearch}%`);
-    const { data } = await q;
-    setModelList((data ?? []) as ModelOption[]);
+    q.then(({ data }) => {
+      if (!cancelled) setModelList((data ?? []) as ModelOption[]);
+    });
+    return () => { cancelled = true; };
   }, [modelSearch, supabase]);
 
-  useEffect(() => { searchModels(); }, [searchModels]);
-
-  // Search warehouses
-  const searchWarehouses = useCallback(async () => {
+  useEffect(() => {
+    let cancelled = false;
     let q = supabase.from("warehouse")
       .select("id, name")
       .eq("enabled", true)
       .order("name").limit(20);
     if (whSearch) q = q.ilike("name", `%${whSearch}%`);
-    const { data } = await q;
-    setWhList((data ?? []) as WarehouseOption[]);
+    q.then(({ data }) => {
+      if (!cancelled) setWhList((data ?? []) as WarehouseOption[]);
+    });
+    return () => { cancelled = true; };
   }, [whSearch, supabase]);
-
-  useEffect(() => { searchWarehouses(); }, [searchWarehouses]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

@@ -160,23 +160,24 @@ export default async function AdminAuditLogPage({
       {/* ── Filters ──────────────────────────────────────────────── */}
       <form
         method="GET"
-        className="flex flex-wrap items-end gap-3 rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/80"
+        className="surface-panel flex flex-wrap items-end gap-3 rounded-lg p-4"
       >
         <div className="flex flex-col gap-1.5">
           <label
             htmlFor="action-filter"
-            className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            className="text-sm font-medium text-app-muted-strong"
           >
             操作类型
           </label>
           <select
             id="action-filter"
             name="action"
-            className="flex h-10 w-full min-w-[160px] rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+            defaultValue={selectedAction}
+            className="focus-ring premium-control flex h-10 w-full min-w-[160px] rounded-lg border border-app-border px-3 py-2 text-sm text-app-fg focus:border-app-accent"
           >
             <option value="">全部操作</option>
             {actionOptions.map((a) => (
-              <option key={a} value={a} selected={selectedAction === a}>
+              <option key={a} value={a}>
                 {ACTION_LABELS[a] ?? a}
               </option>
             ))}
@@ -186,18 +187,19 @@ export default async function AdminAuditLogPage({
         <div className="flex flex-col gap-1.5">
           <label
             htmlFor="resource-filter"
-            className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            className="text-sm font-medium text-app-muted-strong"
           >
             资源类型
           </label>
           <select
             id="resource-filter"
             name="resource_type"
-            className="flex h-10 w-full min-w-[160px] rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+            defaultValue={selectedResource}
+            className="focus-ring premium-control flex h-10 w-full min-w-[160px] rounded-lg border border-app-border px-3 py-2 text-sm text-app-fg focus:border-app-accent"
           >
             <option value="">全部资源</option>
             {resourceOptions.map((r) => (
-              <option key={r} value={r} selected={selectedResource === r}>
+              <option key={r} value={r}>
                 {RESOURCE_LABELS[r] ?? r}
               </option>
             ))}
@@ -207,7 +209,7 @@ export default async function AdminAuditLogPage({
         <div className="flex items-center gap-2">
           <button
             type="submit"
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700 active:bg-blue-800 transition-colors"
+            className="focus-ring inline-flex h-10 items-center gap-2 rounded-lg bg-app-accent px-4 text-sm font-medium text-app-accent-contrast transition-colors hover:bg-app-accent-hover"
           >
             <Search className="h-4 w-4" />
             筛选
@@ -216,7 +218,7 @@ export default async function AdminAuditLogPage({
           {(selectedAction || selectedResource) && (
             <Link
               href="/admin/audit-log"
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 hover:bg-zinc-50 active:bg-zinc-100 transition-colors dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              className="focus-ring premium-control inline-flex h-10 items-center gap-2 rounded-lg border border-app-border px-4 text-sm font-medium text-app-muted-strong transition-colors hover:text-app-fg"
             >
               <RotateCcw className="h-4 w-4" />
               重置

@@ -11,18 +11,18 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClass: Record<Variant, string> = {
-  default:   "bg-zinc-900 text-white hover:bg-zinc-800 active:bg-zinc-950 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 dark:active:bg-zinc-300",
-  primary:   "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800",
-  destructive:"bg-red-600 text-white hover:bg-red-700 active:bg-red-800",
-  outline:   "border border-zinc-300 bg-white hover:bg-zinc-50 active:bg-zinc-100 dark:border-zinc-600 dark:bg-zinc-800 dark:hover:bg-zinc-700 dark:active:bg-zinc-600",
-  ghost:     "hover:bg-zinc-100 active:bg-zinc-200 dark:hover:bg-zinc-800 dark:active:bg-zinc-700",
-  link:      "text-blue-600 underline-offset-4 hover:underline dark:text-blue-400",
+  default: "border border-transparent bg-app-fg text-app-surface shadow-sm hover:opacity-90 active:opacity-95",
+  primary: "border border-transparent bg-app-accent text-app-accent-contrast shadow-[0_12px_30px_color-mix(in_srgb,var(--accent)_24%,transparent)] hover:bg-app-accent-hover hover:shadow-[var(--shadow-md)]",
+  destructive: "border border-transparent bg-app-danger text-white shadow-sm hover:opacity-90",
+  outline: "premium-control border border-app-border-strong text-app-fg hover:bg-app-surface-muted hover:border-app-border-strong",
+  ghost: "border border-transparent text-app-muted-strong hover:border-app-border hover:bg-app-surface/70 hover:text-app-fg",
+  link: "text-app-accent underline-offset-4 hover:underline",
 };
 
 const sizeClass: Record<Size, string> = {
-  sm: "h-8 px-3 text-xs rounded-lg gap-1.5",
+  sm: "h-8 px-3 text-xs rounded-md gap-1.5",
   md: "h-10 px-4 text-sm rounded-lg gap-2",
-  lg: "h-12 px-6 text-base rounded-xl gap-2",
+  lg: "h-11 px-5 text-sm rounded-lg gap-2",
 };
 
 export function Button({ className, variant = "default", size = "md", ref, children, ...props }: Props) {
@@ -30,10 +30,10 @@ export function Button({ className, variant = "default", size = "md", ref, child
     <button
       ref={ref}
       className={cn(
-        "inline-flex items-center justify-center font-medium transition-colors transition-transform duration-150",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-zinc-900",
+        "inline-flex items-center justify-center whitespace-nowrap font-medium transition-[background-color,border-color,color,box-shadow,opacity,transform] duration-150",
+        "focus-ring",
         "disabled:pointer-events-none disabled:opacity-50",
-        "active:scale-[0.97]",
+        "hover:-translate-y-px active:translate-y-0 active:scale-[0.98]",
         variantClass[variant],
         sizeClass[size],
         className,
@@ -44,3 +44,5 @@ export function Button({ className, variant = "default", size = "md", ref, child
     </button>
   );
 }
+
+

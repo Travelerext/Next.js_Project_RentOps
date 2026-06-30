@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { PackagePlus, Loader2 } from "lucide-react";
 
 export default function NewEquipmentPage() {
   const router = useRouter();
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
@@ -26,7 +26,7 @@ export default function NewEquipmentPage() {
     supabase.from("equipment_model").select("id, model_name").order("model_name").then(({ data }) => setModels(data ?? []));
     supabase.from("warehouse").select("id, name").order("name").then(({ data }) => setWarehouses(data ?? []));
     supabase.from("station").select("id, name").order("name").then(({ data }) => setStations(data ?? []));
-  }, []);
+  }, [supabase]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();

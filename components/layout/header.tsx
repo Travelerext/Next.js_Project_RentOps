@@ -4,8 +4,36 @@ import { useCallback, useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Bell, LogOut, Menu, User } from "lucide-react";
+import { Bell, BrainCircuit, Laptop, LogOut, Menu, Moon, Sun, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+
+type ThemePreference = "system" | "light" | "dark";
+type ResolvedTheme = "light" | "dark";
+
+function getSystemTheme(): ResolvedTheme {
+  if (typeof window === "undefined") return "light";
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function getInitialThemePreference(): ThemePreference {
+  if (typeof window === "undefined") return "system";
+  const saved = localStorage.getItem("rentops-theme");
+  if (saved === "light" || saved === "dark") return saved;
+  return "system";
+}
+
+function applyTheme(preference: ThemePreference) {
+  if (preference === "system") {
+    document.documentElement.removeAttribute("data-theme");
+    document.documentElement.style.colorScheme = "light dark";
+    localStorage.removeItem("rentops-theme");
+    return;
+  }
+
+  document.documentElement.dataset.theme = preference;
+  document.documentElement.style.colorScheme = preference;
+  localStorage.setItem("rentops-theme", preference);
+}
 
 export function Header({
   displayName,
@@ -17,6 +45,9 @@ export function Header({
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
   const [notifCount, setNotifCount] = useState(0);
+  const [themePreference, setThemePreference] = useState<ThemePreference>(() => getInitialThemePreference());
+  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(() => getSystemTheme());
+  const resolvedTheme = themePreference === "system" ? systemTheme : themePreference;
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
@@ -49,41 +80,93 @@ export function Header({
     return () => { mounted = false; document.removeEventListener("visibilitychange", onVisible); };
   }, [supabase]);
 
+  useEffect(() => {
+    applyTheme(themePreference);
+  }, [themePreference]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => setSystemTheme(media.matches ? "dark" : "light");
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setThemePreference((current) => {
+      if (current === "system") return "dark";
+      if (current === "dark") return "light";
+      return "system";
+    });
+  }, []);
+
+  const themeLabel =
+    themePreference === "system"
+      ? `跟随系统（当前${resolvedTheme === "dark" ? "深色" : "浅色"}）`
+      : themePreference === "dark"
+        ? "深色模式"
+        : "浅色模式";
+
   return (
     <header
-      className="flex h-14 items-center justify-between border-b border-zinc-200 bg-white/80 backdrop-blur-sm px-4 md:px-6 dark:border-zinc-800 dark:bg-zinc-900/80"
+      className="app-chrome relative z-20 flex h-16 shrink-0 items-center justify-between border-b border-app-border px-4 md:h-[4.5rem] md:px-7"
       style={{ viewTransitionName: "site-header" }}
     >
       {/* Left */}
       <div className="flex items-center gap-3">
         <button
           onClick={onMenuClick}
-          className="md:hidden rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="focus-ring premium-control rounded-lg border border-app-border p-2 text-app-muted shadow-sm hover:text-app-fg md:hidden"
           aria-label="打开菜单"
         >
           <Menu className="h-5 w-5" />
         </button>
-        <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400 hidden sm:block">
-          机械设备租赁管理系统
-        </span>
+        <div className="hidden min-w-0 sm:block">
+          <p className="text-sm font-semibold text-app-fg">RentOps</p>
+          <p className="text-xs text-app-muted">设备租赁智能运营平台</p>
+        </div>
       </div>
 
       {/* Right */}
       <div className="flex items-center gap-1 md:gap-2">
+        <Link
+          href="/ai"
+          className="focus-ring inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-app-border bg-app-accent-soft px-2.5 text-sm font-semibold text-app-accent shadow-sm transition-[background-color,border-color,color,box-shadow,transform] hover:-translate-y-0.5 hover:border-app-border-strong hover:bg-app-surface hover:text-app-fg"
+          aria-label="AI 助手"
+        >
+          <BrainCircuit className="h-4 w-4" />
+          <span className="hidden sm:inline">AI</span>
+        </Link>
+
         {/* Notifications */}
-        <Link href="/notifications" className="relative inline-flex items-center justify-center rounded-lg h-8 w-8 hover:bg-zinc-100 dark:hover:bg-zinc-800" aria-label="通知">
+        <Link href="/notifications" className="focus-ring relative inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-app-muted-strong transition-[background-color,border-color,color,transform] hover:-translate-y-0.5 hover:border-app-border hover:bg-app-surface hover:text-app-fg" aria-label="通知">
           <Bell className="h-4 w-4" />
           {notifCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-app-danger px-1 text-[10px] font-bold text-white">
               {notifCount > 99 ? "99+" : notifCount}
             </span>
           )}
         </Link>
 
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-app-muted-strong transition-[background-color,border-color,color,transform] hover:-translate-y-0.5 hover:border-app-border hover:bg-app-surface hover:text-app-fg"
+          aria-label={`主题：${themeLabel}`}
+          title={`主题：${themeLabel}`}
+        >
+          {themePreference === "system" ? (
+            <Laptop className="h-4 w-4" />
+          ) : resolvedTheme === "dark" ? (
+            <Sun className="h-4 w-4" />
+          ) : (
+            <Moon className="h-4 w-4" />
+          )}
+        </button>
+
         {/* User / Profile */}
         <Link
           href="/profile"
-          className="hidden sm:flex items-center gap-1.5 text-sm text-zinc-700 dark:text-zinc-300 ml-1 rounded-lg px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+          className="focus-ring premium-control ml-1 hidden h-9 items-center gap-2 rounded-lg border border-app-border px-2.5 text-sm text-app-muted-strong transition-[background-color,border-color,color,box-shadow,transform] hover:-translate-y-0.5 hover:text-app-fg sm:flex"
         >
           <User className="h-4 w-4" aria-hidden="true" />
           <span>{displayName ?? "用户"}</span>
@@ -104,3 +187,5 @@ export function Header({
     </header>
   );
 }
+
+

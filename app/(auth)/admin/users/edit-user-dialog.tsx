@@ -143,7 +143,7 @@ export function EditUserDialog({
         <div className="flex flex-col gap-1.5">
           <label
             htmlFor="remark"
-            className="text-sm font-medium text-zinc-700 dark:text-zinc-300"
+            className="text-sm font-medium text-app-muted-strong"
           >
             备注
           </label>
@@ -152,7 +152,7 @@ export function EditUserDialog({
             name="remark"
             rows={3}
             defaultValue={profile.remark ?? ""}
-            className="flex w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-500"
+            className="focus-ring premium-control flex w-full rounded-lg border border-app-border px-3 py-2 text-sm text-app-fg placeholder:text-app-muted transition-[border-color,box-shadow] focus:border-app-accent"
           />
           {fieldErrors.remark && (
             <p className="text-xs text-red-500">{fieldErrors.remark}</p>

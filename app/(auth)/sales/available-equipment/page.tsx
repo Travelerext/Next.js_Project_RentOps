@@ -8,7 +8,6 @@ import { Select } from "@/components/ui/select";
 import { formatCurrency } from "@/lib/utils";
 import { EQUIPMENT_STATUS } from "@/lib/constants";
 import { ActionLink } from "@/components/data/action-link";
-import Link from "next/link";
 import { Search } from "lucide-react";
 
 export default async function AvailableEquipmentPage({

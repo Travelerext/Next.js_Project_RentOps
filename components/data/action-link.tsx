@@ -30,9 +30,11 @@ export function ActionLink({
     <button
       type="button"
       onClick={handleClick}
-      className="inline-flex items-center rounded-md border border-zinc-300 bg-white px-3 py-1 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+      className="focus-ring inline-flex items-center rounded-md border border-app-border-strong bg-app-surface px-3 py-1 text-sm font-medium text-app-muted-strong shadow-sm transition-colors hover:bg-app-surface-muted hover:text-app-fg"
     >
       {children}
     </button>
   );
 }
+
+

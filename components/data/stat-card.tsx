@@ -4,12 +4,12 @@ import type { LucideIcon } from "lucide-react";
 type Color = "blue" | "emerald" | "red" | "amber" | "purple" | "indigo";
 
 const colorMap: Record<Color, { bg: string; icon: string }> = {
-  blue:    { bg: "bg-blue-100 dark:bg-blue-900/30",    icon: "text-blue-600 dark:text-blue-400" },
-  emerald: { bg: "bg-emerald-100 dark:bg-emerald-900/30", icon: "text-emerald-600 dark:text-emerald-400" },
-  red:     { bg: "bg-red-100 dark:bg-red-900/30",      icon: "text-red-600 dark:text-red-400" },
-  amber:   { bg: "bg-amber-100 dark:bg-amber-900/30",  icon: "text-amber-600 dark:text-amber-400" },
-  purple:  { bg: "bg-purple-100 dark:bg-purple-900/30", icon: "text-purple-600 dark:text-purple-400" },
-  indigo:  { bg: "bg-indigo-100 dark:bg-indigo-900/30", icon: "text-indigo-600 dark:text-indigo-400" },
+  blue: { bg: "bg-app-accent-soft", icon: "text-app-accent" },
+  emerald: { bg: "bg-app-success-soft", icon: "text-app-success" },
+  red: { bg: "bg-app-danger-soft", icon: "text-app-danger" },
+  amber: { bg: "bg-app-warning-soft", icon: "text-app-warning" },
+  purple: { bg: "bg-app-info-soft", icon: "text-app-info" },
+  indigo: { bg: "bg-app-info-soft", icon: "text-app-info" },
 };
 
 interface Props {
@@ -20,15 +20,17 @@ interface Props {
 export function StatCard({ icon: Icon, label, value, color = "blue", href, children }: Props) {
   const c = colorMap[color];
   const inner = (
-    <div className="flex items-center gap-3">
-      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${c.bg}`}><Icon className={`h-5 w-5 ${c.icon}`} /></div>
+    <div className="relative flex min-h-24 items-start justify-between gap-3 overflow-hidden">
       <div className="min-w-0">
-        {value !== undefined && <p className={`text-2xl font-bold text-zinc-900 dark:text-zinc-100 tabular-nums truncate ${color === "red" ? "text-red-600 dark:text-red-400" : ""}`}>{value}</p>}
-        <p className="text-xs text-zinc-500 dark:text-zinc-400 truncate">{label}</p>
+        <p className="truncate text-xs font-semibold uppercase tracking-wide text-app-muted">{label}</p>
+        {value !== undefined && <p className={`mt-3 truncate text-[30px] font-semibold leading-none tabular-nums tracking-normal text-app-fg sm:text-[34px] ${color === "red" ? "text-app-danger" : ""}`}>{value}</p>}
         {children}
       </div>
+      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-app-border ${c.bg} shadow-sm`}><Icon className={`h-5 w-5 ${c.icon}`} /></div>
     </div>
   );
-  const cls = "rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-800/80" + (href ? " transition-shadow hover:shadow-md" : "");
+  const cls = "surface-panel rounded-lg p-4 md:p-5" + (href ? " transition-[border-color,box-shadow,transform] hover:-translate-y-1 hover:border-app-border-strong hover:shadow-[var(--shadow-md)]" : "");
   return href ? <Link href={href} className={cls}>{inner}</Link> : <div className={cls}>{inner}</div>;
 }
+
+

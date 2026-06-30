@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Loader2, CheckCircle, AlertTriangle, AlertCircle } from "lucide-react";
 import { confirmSettlement } from "@/lib/actions/settlement";
-import { formatCurrency } from "@/lib/utils";
 
 interface Props {
   inspectionId: string;

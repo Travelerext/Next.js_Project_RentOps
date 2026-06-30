@@ -3,7 +3,6 @@ import { DataTable, type Column } from "@/components/data/data-table";
 import { DataPage } from "@/components/data/data-page";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { ORDER_STATUS, ORDER_STATUS_VARIANTS } from "@/lib/constants";
 import Link from "next/link";

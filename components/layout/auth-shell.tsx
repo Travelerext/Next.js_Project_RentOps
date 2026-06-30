@@ -32,17 +32,22 @@ const COLLAPSED_KEY = "sidebar-collapsed";
 
 export function AuthShell({ children, displayName, dashboard, primaryRole }: Props) {
   const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem(COLLAPSED_KEY) === "true";
-    }
-    return false;
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(COLLAPSED_KEY) === "true";
   });
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Persist collapsed state
   useEffect(() => {
     localStorage.setItem(COLLAPSED_KEY, String(collapsed));
   }, [collapsed]);
+
+  useEffect(() => {
+    const onResize = () => {
+      if (window.innerWidth >= 768) setMobileOpen(false);
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const toggle = useCallback(() => {
     if (window.innerWidth < 768) {
@@ -56,7 +61,7 @@ export function AuthShell({ children, displayName, dashboard, primaryRole }: Pro
 
   return (
     <SidebarContext.Provider value={{ collapsed, setCollapsed }}>
-      <div className="flex h-screen overflow-hidden bg-zinc-50 dark:bg-zinc-950">
+      <div className="flex h-dvh overflow-hidden bg-app-bg text-app-fg">
         <Sidebar
           dashboard={dashboard}
           primaryRole={primaryRole}
@@ -65,13 +70,17 @@ export function AuthShell({ children, displayName, dashboard, primaryRole }: Pro
           onToggle={toggle}
           onMobileClose={handleMobileClose}
         />
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="app-page-shell flex flex-1 flex-col overflow-hidden">
           <Header displayName={displayName} onMenuClick={toggle} />
-          <main className="flex-1 overflow-auto p-4 md:p-6">
-            {children}
+          <main className="app-page-content flex-1 overflow-auto">
+            <div className="mx-auto w-full max-w-[1560px] px-4 py-5 sm:px-6 md:px-8 md:py-8 lg:px-10 xl:py-10">
+              {children}
+            </div>
           </main>
         </div>
       </div>
     </SidebarContext.Provider>
   );
 }
+
+
