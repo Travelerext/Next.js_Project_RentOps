@@ -4,8 +4,8 @@ import "./globals.css";
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f5f7fb" },
-    { media: "(prefers-color-scheme: dark)", color: "#080b12" },
+    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#16234a" },
   ],
   width: "device-width",
   initialScale: 1,
@@ -14,7 +14,10 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "机械设备租赁管理系统",
   description: "机械设备租赁管理系统 - 订单、合同、设备、财务、维修一体化管理",
-  icons: { icon: "/icon.svg" },
+  icons: {
+    icon: "/favicon.png",
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({

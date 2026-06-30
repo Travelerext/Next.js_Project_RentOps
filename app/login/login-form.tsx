@@ -3,9 +3,10 @@
 import { useActionState, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { login, signup } from "@/lib/actions/auth";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { HardHat, Loader2, Sparkles } from "lucide-react";
+import { Loader2, Sparkles } from "lucide-react";
 
 export function LoginForm() {
   const router = useRouter();
@@ -41,7 +42,7 @@ export function LoginForm() {
         <section className="hidden min-w-0 lg:block">
           <div className="inline-flex items-center gap-2 rounded-full border border-app-border bg-app-surface/72 px-3 py-1.5 text-xs font-semibold text-app-accent shadow-sm backdrop-blur-xl">
             <Sparkles className="h-3.5 w-3.5" />
-            RentOps Intelligence Suite
+            RentOps 智能租赁运营套件
           </div>
           <h1 className="mt-5 max-w-xl text-5xl font-semibold leading-tight tracking-normal text-app-fg text-pretty">
             机械租赁运营，从资产到现金流一屏掌控。
@@ -61,9 +62,7 @@ export function LoginForm() {
 
         <div className="w-full max-w-md justify-self-center lg:max-w-none">
           <div className="mb-6 flex items-center justify-center gap-3 text-center lg:justify-start">
-            <div className="brand-mark flex h-12 w-12 items-center justify-center rounded-lg">
-              <HardHat className="h-6 w-6 text-app-accent-contrast" />
-            </div>
+            <BrandLogo size={48} priority />
             <div className="text-left">
               <h2 className="text-xl font-semibold text-app-fg text-pretty">
                 RentOps

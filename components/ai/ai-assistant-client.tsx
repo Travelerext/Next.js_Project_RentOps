@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { BrainCircuit, Loader2, Send, Sparkles, UserRound } from "lucide-react";
+import { Loader2, Send, Sparkles, UserRound } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
@@ -109,9 +110,7 @@ export function AIAssistantClient({ roleLabel, roleFocus, examples }: Props) {
       <section className="surface-panel-elevated flex min-h-[680px] flex-col overflow-hidden rounded-lg">
         <div className="app-chrome border-b border-app-border px-4 py-4">
           <div className="flex items-center gap-2">
-            <div className="brand-mark flex h-10 w-10 items-center justify-center rounded-lg">
-              <BrainCircuit className="h-5 w-5 text-app-accent-contrast" />
-            </div>
+            <BrandLogo size={40} priority />
             <div className="min-w-0">
               <h2 className="truncate text-base font-semibold text-app-fg">RentOps Intelligence</h2>
               <p className="truncate text-xs text-app-muted">{roleLabel} · {roleFocus}</p>
@@ -191,9 +190,7 @@ function ChatBubble({ message }: { message: Message }) {
   return (
     <div className={cn("flex gap-3", isUser && "justify-end")}>
       {!isUser && (
-        <div className="brand-mark mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-          <BrainCircuit className="h-4 w-4 text-app-accent-contrast" />
-        </div>
+        <BrandLogo size={32} className="mt-1" />
       )}
       <div
         className={cn(

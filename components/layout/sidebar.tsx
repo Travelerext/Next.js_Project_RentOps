@@ -3,13 +3,14 @@
 import { useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { BrandLogo } from "@/components/brand-logo";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, Users, Truck, FileText, DollarSign, Wrench,
   CheckSquare, Package, Scan, Settings, ChevronLeft, X,
   UserPlus, ShoppingCart, AlertTriangle, BarChart3, ClipboardList,
   Calendar, Shield, CreditCard, Receipt, Banknote, ArrowLeftRight,
-  HardHat, Boxes, Gauge, Calculator, TrendingUp, ListChecks,
+  Boxes, Gauge, Calculator, TrendingUp, ListChecks,
   History, PlusCircle, BrainCircuit, type LucideIcon,
 } from "lucide-react";
 
@@ -238,18 +239,14 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
       <div className="flex h-16 items-center justify-between border-b border-app-border px-3 md:h-[4.5rem]">
         {!compact && (
           <div className="flex items-center gap-2 truncate">
-            <div className="brand-mark flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
-              <HardHat className="h-4 w-4 text-app-accent-contrast" />
-            </div>
+            <BrandLogo size={40} priority />
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-app-fg">RentOps</p>
             </div>
           </div>
         )}
         {compact && (
-          <div className="brand-mark mx-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
-            <HardHat className="h-4 w-4 text-app-accent-contrast" />
-          </div>
+          <BrandLogo size={40} className="mx-auto" priority />
         )}
         <button
           onClick={onToggle}
@@ -336,7 +333,7 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
                 title={compact ? item.label : undefined}
                 aria-current={active ? "page" : undefined}
               >
-                {active && <span className="absolute left-0 top-2 h-6 w-1 rounded-r-full bg-app-accent shadow-[0_0_18px_color-mix(in_srgb,var(--accent)_44%,transparent)]" aria-hidden="true" />}
+                {active && <span className="absolute left-0 top-2 h-6 w-1 rounded-r-full bg-[var(--brand-teal)] shadow-[0_0_18px_color-mix(in_srgb,var(--brand-teal)_38%,transparent)]" aria-hidden="true" />}
                 <span className={cn("flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors", active ? "bg-app-accent-soft" : "group-hover:bg-app-surface-muted")}>
                   <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                 </span>
@@ -386,7 +383,7 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
       {/* Desktop sidebar */}
       <aside
         className={cn(
-          "app-chrome relative z-30 hidden flex-col border-r border-app-border transition-[width] duration-200 ease-in-out md:flex",
+          "sidebar-brand-shell relative z-30 hidden flex-col border-r border-app-border transition-[width] duration-200 ease-in-out md:flex",
           collapsed ? "w-16" : "w-60"
         )}
         style={{ viewTransitionName: "site-sidebar" }}
@@ -399,7 +396,7 @@ export function Sidebar({ dashboard, primaryRole, collapsed, mobileOpen, onToggl
         <div className="md:hidden fixed inset-0 z-50">
           <div className="fixed inset-0 bg-black/45 backdrop-blur-sm animate-fade-in" onClick={onMobileClose} aria-hidden="true" />
           <aside
-            className="safe-top safe-bottom surface-panel fixed bottom-0 left-0 top-0 flex w-72 max-w-[86vw] flex-col animate-slide-in-left overscroll-contain"
+            className="safe-top safe-bottom sidebar-brand-shell fixed bottom-0 left-0 top-0 flex w-72 max-w-[86vw] flex-col animate-slide-in-left overscroll-contain"
             role="dialog" aria-modal="true" aria-label="导航菜单"
           >
             {nav}

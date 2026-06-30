@@ -12,7 +12,7 @@ interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantClass: Record<Variant, string> = {
   default: "border border-transparent bg-app-fg text-app-surface shadow-sm hover:opacity-90 active:opacity-95",
-  primary: "border border-transparent bg-app-accent text-app-accent-contrast shadow-[0_12px_30px_color-mix(in_srgb,var(--accent)_24%,transparent)] hover:bg-app-accent-hover hover:shadow-[var(--shadow-md)]",
+  primary: "border border-transparent bg-app-accent text-app-accent-contrast shadow-[0_12px_30px_color-mix(in_srgb,var(--brand-primary)_24%,transparent)] hover:bg-app-accent-hover hover:shadow-[var(--shadow-md)]",
   destructive: "border border-transparent bg-app-danger text-white shadow-sm hover:opacity-90",
   outline: "premium-control border border-app-border-strong text-app-fg hover:bg-app-surface-muted hover:border-app-border-strong",
   ghost: "border border-transparent text-app-muted-strong hover:border-app-border hover:bg-app-surface/70 hover:text-app-fg",

@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { BrandLogo } from "@/components/brand-logo";
 import { Button } from "@/components/ui/button";
 import { Bell, BrainCircuit, Laptop, LogOut, Menu, Moon, Sun, User } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -120,7 +121,8 @@ export function Header({
         >
           <Menu className="h-5 w-5" />
         </button>
-        <div className="hidden min-w-0 sm:block">
+        <BrandLogo size={36} priority />
+        <div className="hidden min-w-0 md:block">
           <p className="text-sm font-semibold text-app-fg">RentOps</p>
           <p className="text-xs text-app-muted">设备租赁智能运营平台</p>
         </div>
@@ -134,7 +136,7 @@ export function Header({
           aria-label="AI 助手"
         >
           <BrainCircuit className="h-4 w-4" />
-          <span className="hidden sm:inline">AI</span>
+          <span className="hidden md:inline">AI</span>
         </Link>
 
         {/* Notifications */}
@@ -166,7 +168,7 @@ export function Header({
         {/* User / Profile */}
         <Link
           href="/profile"
-          className="focus-ring premium-control ml-1 hidden h-9 items-center gap-2 rounded-lg border border-app-border px-2.5 text-sm text-app-muted-strong transition-[background-color,border-color,color,box-shadow,transform] hover:-translate-y-0.5 hover:text-app-fg sm:flex"
+          className="focus-ring premium-control ml-1 hidden h-9 items-center gap-2 rounded-lg border border-app-border px-2.5 text-sm text-app-muted-strong transition-[background-color,border-color,color,box-shadow,transform] hover:-translate-y-0.5 hover:text-app-fg lg:flex"
         >
           <User className="h-4 w-4" aria-hidden="true" />
           <span>{displayName ?? "用户"}</span>
