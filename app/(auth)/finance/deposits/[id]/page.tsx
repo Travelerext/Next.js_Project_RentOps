@@ -20,6 +20,34 @@ const STATUS_VARIANTS: Record<string, "success" | "warning" | "danger" | "info" 
   REFUNDING: "warning", REFUNDED: "success", COMPLETED: "default",
 };
 
+type CurrencyAmount = string | number;
+
+type DepositDetail = {
+  id: string;
+  deposit_no: string;
+  customer_id: string;
+  order_id: string;
+  contract_id: string;
+  amount: CurrencyAmount;
+  paid_amount: CurrencyAmount;
+  deducted_amount: CurrencyAmount;
+  refunded_amount: CurrencyAmount;
+  available_amount: CurrencyAmount;
+  deposit_status: string;
+  created_at: string;
+  customer: { name: string } | null;
+  order: { order_no: string } | null;
+  contract: { contract_no: string } | null;
+};
+
+type RefundRow = {
+  id: string;
+  refund_no: string;
+  refund_amount: CurrencyAmount;
+  refund_status: string;
+  created_at: string;
+};
+
 export default async function DepositDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -31,11 +59,11 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
     .single();
   if (!raw) notFound();
 
-  const deposit = raw as Record<string, unknown>;
-  const customer = deposit.customer as { name: string } | null;
-  const order = deposit.order as { order_no: string } | null;
-  const contract = deposit.contract as { contract_no: string } | null;
-  const status = deposit.deposit_status as string;
+  const deposit = raw as unknown as DepositDetail;
+  const customer = deposit.customer;
+  const order = deposit.order;
+  const contract = deposit.contract;
+  const status = deposit.deposit_status;
 
   // Related refunds
   const { data: refunds } = await supabase
@@ -44,16 +72,18 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
     .eq("deposit_id", id)
     .order("created_at", { ascending: false });
 
-  const refundColumns: Column<Record<string, unknown>>[] = [
-    { id: "no", header: "退款编号", cell: (r) => <Link href={`/finance/refunds/${r.id}`} className="font-mono text-xs text-blue-600 hover:underline">{r.refund_no as string}</Link> },
+  const refundRows = (refunds ?? []) as unknown as RefundRow[];
+
+  const refundColumns: Column<RefundRow>[] = [
+    { id: "no", header: "退款编号", cell: (r) => <Link href={`/finance/refunds/${r.id}`} className="font-mono text-xs text-blue-600 hover:underline">{r.refund_no}</Link> },
     { id: "amount", header: "退款金额", cell: (r) => <span className="tabular-nums font-medium">{formatCurrency(r.refund_amount)}</span> },
     { id: "status", header: "状态", cell: (r) => {
-      const s = r.refund_status as string;
+      const s = r.refund_status;
       const labels: Record<string, string> = { PENDING_APPROVAL: "待审批", APPROVED: "已批准", REJECTED: "已驳回", REFUNDED: "已退款" };
       const variants: Record<string, "success" | "warning" | "danger" | "info"> = { PENDING_APPROVAL: "warning", APPROVED: "info", REJECTED: "danger", REFUNDED: "success" };
       return <Badge variant={variants[s] ?? "default"}>{labels[s] ?? s}</Badge>;
     }},
-    { id: "created", header: "创建时间", cell: (r) => formatDate(r.created_at as string) },
+    { id: "created", header: "创建时间", cell: (r) => formatDate(r.created_at) },
   ];
 
   return (
@@ -68,7 +98,7 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><Banknote className="h-4 w-4" />押金信息</CardTitle></CardHeader>
         <InfoGrid items={[
-          { label: "押金编号", value: deposit.deposit_no as string },
+          { label: "押金编号", value: deposit.deposit_no },
           { label: "客户", value: customer ? <Link href={`/sales/customers/${deposit.customer_id}`} className="text-blue-600 hover:underline">{customer.name}</Link> : "-" },
           { label: "订单", value: order ? <Link href={`/sales/orders/${deposit.order_id}`} className="text-blue-600 hover:underline">{order.order_no}</Link> : "-" },
           { label: "合同", value: contract ? <Link href={`/sales/contracts/${deposit.contract_id}`} className="text-blue-600 hover:underline">{contract.contract_no}</Link> : "-" },
@@ -88,8 +118,8 @@ export default async function DepositDetailPage({ params }: { params: Promise<{ 
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><ArrowDownToLine className="h-4 w-4" />退款记录 ({(refunds ?? []).length})</CardTitle></CardHeader>
-        <DataTable columns={refundColumns} data={(refunds ?? []) as Record<string, unknown>[]} keyExtractor={(r) => r.id as string} emptyMessage="暂无退款记录" />
+        <CardHeader><CardTitle className="flex items-center gap-2"><ArrowDownToLine className="h-4 w-4" />退款记录 ({refundRows.length})</CardTitle></CardHeader>
+        <DataTable columns={refundColumns} data={refundRows} keyExtractor={(r) => r.id} emptyMessage="暂无退款记录" />
       </Card>
     </div>
   );

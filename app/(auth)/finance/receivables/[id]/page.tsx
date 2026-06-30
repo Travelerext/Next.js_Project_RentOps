@@ -24,6 +24,35 @@ const TYPE_LABELS: Record<string, string> = {
   LATE_FEE: "滞纳金", PENALTY: "违约金", OTHER: "其他",
 };
 
+type CurrencyAmount = string | number;
+
+type ReceivableDetail = {
+  id: string;
+  receivable_no: string;
+  customer_id: string;
+  order_id: string | null;
+  contract_id: string | null;
+  receivable_type: string;
+  amount: CurrencyAmount;
+  paid_amount: CurrencyAmount;
+  unpaid_amount: CurrencyAmount;
+  due_date: string | null;
+  overdue_days: number | null;
+  status: string;
+  customer: { name: string } | null;
+  order: { order_no: string } | null;
+  contract: { contract_no: string } | null;
+};
+
+type PaymentRow = {
+  id: string;
+  payment_no: string;
+  amount: CurrencyAmount;
+  payment_method: string;
+  payer_name: string | null;
+  paid_at: string;
+};
+
 export default async function ReceivableDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ customerId?: string; status?: string }> }) {
   const { id } = await params;
   const sp = await searchParams;
@@ -40,10 +69,10 @@ export default async function ReceivableDetailPage({ params, searchParams }: { p
     .single();
   if (!raw) notFound();
 
-  const receivable = raw as Record<string, unknown>;
-  const customer = receivable.customer as { name: string } | null;
-  const order = receivable.order as { order_no: string } | null;
-  const contract = receivable.contract as { contract_no: string } | null;
+  const receivable = raw as unknown as ReceivableDetail;
+  const customer = receivable.customer;
+  const order = receivable.order;
+  const contract = receivable.contract;
 
   // Payment history
   const { data: payments } = await supabase
@@ -52,37 +81,38 @@ export default async function ReceivableDetailPage({ params, searchParams }: { p
     .eq("receivable_id", id)
     .order("paid_at", { ascending: false });
 
-  const paymentColumns: Column<Record<string, unknown>>[] = [
-    { id: "payment_no", header: "流水号", cell: (p) => <span className="font-mono text-xs">{p.payment_no as string}</span> },
+  const paymentRows = (payments ?? []) as unknown as PaymentRow[];
+
+  const paymentColumns: Column<PaymentRow>[] = [
+    { id: "payment_no", header: "流水号", cell: (p) => <span className="font-mono text-xs">{p.payment_no}</span> },
     { id: "amount", header: "金额", cell: (p) => <span className="tabular-nums font-medium">{formatCurrency(p.amount)}</span> },
-    { id: "method", header: "方式", cell: (p) => <span className="text-xs">{p.payment_method as string}</span> },
-    { id: "payer", header: "付款人", cell: (p) => (p.payer_name as string) ?? "-" },
-    { id: "paid_at", header: "到账时间", cell: (p) => formatDateTime(p.paid_at as string) },
+    { id: "method", header: "方式", cell: (p) => <span className="text-xs">{p.payment_method}</span> },
+    { id: "payer", header: "付款人", cell: (p) => p.payer_name ?? "-" },
+    { id: "paid_at", header: "到账时间", cell: (p) => formatDateTime(p.paid_at) },
   ];
 
-  const unpaid = parseFloat((receivable.unpaid_amount as string) ?? "0");
-  const canPay = ["UNPAID", "PARTIAL", "OVERDUE"].includes(receivable.status as string);
+  const unpaid = parseFloat(String(receivable.unpaid_amount ?? "0"));
+  const canPay = ["UNPAID", "PARTIAL", "OVERDUE"].includes(receivable.status);
 
   return (
     <div className="space-y-6">
-      <PageHeader backUrl="_back"
+      <PageHeader backUrl={backUrl}
         title={`应收详情`}
         subtitle={`${receivable.receivable_no} · ${customer?.name ?? "-"}`}
-        backUrl="_back"
-        status={<Badge variant={STATUS_VARIANTS[receivable.status as string] ?? "default"}>{STATUS_LABELS[receivable.status as string] ?? String(receivable.status)}</Badge>}
-        actions={canPay ? <ConfirmPaymentButton receivableId={id} receivableNo={receivable.receivable_no as string} unpaidAmount={String(unpaid)} /> : undefined}
+        status={<Badge variant={STATUS_VARIANTS[receivable.status] ?? "default"}>{STATUS_LABELS[receivable.status] ?? receivable.status}</Badge>}
+        actions={canPay ? <ConfirmPaymentButton receivableId={id} receivableNo={receivable.receivable_no} unpaidAmount={String(unpaid)} /> : undefined}
       />
 
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" />基本信息</CardTitle></CardHeader>
         <InfoGrid items={[
-          { label: "应收编号", value: receivable.receivable_no as string },
+          { label: "应收编号", value: receivable.receivable_no },
           { label: "客户", value: customer ? <Link href={`/sales/customers/${receivable.customer_id}?from=finance`} className="text-blue-600 hover:underline">{customer.name}</Link> : "-" },
-          { label: "类型", value: TYPE_LABELS[receivable.receivable_type as string] ?? String(receivable.receivable_type) },
+          { label: "类型", value: TYPE_LABELS[receivable.receivable_type] ?? receivable.receivable_type },
           { label: "订单", value: order ? <Link href={`/sales/orders/${receivable.order_id}?from=finance`} className="text-blue-600 hover:underline">{order.order_no}</Link> : "-" },
           { label: "合同", value: contract ? <Link href={`/sales/contracts/${receivable.contract_id}?from=finance`} className="text-blue-600 hover:underline">{contract.contract_no}</Link> : "-" },
-          { label: "到期日", value: (receivable.due_date as string) ? new Date(receivable.due_date as string).toLocaleDateString("zh-CN") : "-" },
-          { label: "逾期天数", value: ((receivable.overdue_days as number) ?? 0) > 0 ? <span className="text-red-600 font-medium">{String(receivable.overdue_days)} 天</span> : "-" },
+          { label: "到期日", value: receivable.due_date ? new Date(receivable.due_date).toLocaleDateString("zh-CN") : "-" },
+          { label: "逾期天数", value: (receivable.overdue_days ?? 0) > 0 ? <span className="text-red-600 font-medium">{String(receivable.overdue_days)} 天</span> : "-" },
         ]} />
       </Card>
 
@@ -96,8 +126,8 @@ export default async function ReceivableDetailPage({ params, searchParams }: { p
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>收款记录 ({(payments ?? []).length})</CardTitle></CardHeader>
-        <DataTable columns={paymentColumns} data={(payments ?? []) as Record<string, unknown>[]} keyExtractor={(p) => p.id as string} emptyMessage="暂无收款记录" />
+        <CardHeader><CardTitle>收款记录 ({paymentRows.length})</CardTitle></CardHeader>
+        <DataTable columns={paymentColumns} data={paymentRows} keyExtractor={(p) => p.id} emptyMessage="暂无收款记录" />
       </Card>
     </div>
   );

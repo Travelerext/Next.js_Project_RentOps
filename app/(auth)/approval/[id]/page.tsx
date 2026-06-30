@@ -100,6 +100,25 @@ type StepRecord = {
   approver: { display_name: string } | null;
 };
 
+type OrderInfo = {
+  id: string;
+  order_no: string;
+  pricing_mode: string;
+  planned_start_at: string | null;
+  planned_end_at: string | null;
+  total_rent_amount: string | number;
+  total_deposit_amount: string | number;
+  customer: { name?: string } | null;
+};
+
+type OrderItem = {
+  id: string;
+  quantity: string | number;
+  actual_unit_price: string | number;
+  rent_amount: string | number;
+  equipment: { name?: string } | null;
+};
+
 // ══════════════════════════════════════════════════════════════════════
 
 export default async function ApprovalDetailPage({
@@ -172,21 +191,21 @@ export default async function ApprovalDetailPage({
   const TYPE_LABEL = TYPE_LABELS[bType] ?? bType;
 
   // Fetch order details for order approvals
-  let orderInfo: Record<string, unknown> | null = null;
-  let orderItems: Record<string, unknown>[] = [];
+  let orderInfo: OrderInfo | null = null;
+  let orderItems: OrderItem[] = [];
   if (["ORDER", "ORDER_APPROVAL"].includes(bType)) {
     const { data: ord } = await supabase
       .from("rental_order")
       .select("*, customer:customer_id(name)")
       .eq("id", bId)
       .maybeSingle();
-    orderInfo = ord as Record<string, unknown> | null;
+    orderInfo = ord as unknown as OrderInfo | null;
     if (orderInfo) {
       const { data: items } = await supabase
         .from("rental_order_item")
         .select("*, equipment:equipment_id(equipment_no, name)")
         .eq("order_id", bId);
-      orderItems = (items ?? []) as Record<string, unknown>[];
+      orderItems = (items ?? []) as unknown as OrderItem[];
     }
   }
 
@@ -248,12 +267,12 @@ export default async function ApprovalDetailPage({
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm px-4 pb-4 md:px-6">
               <div><span className="text-zinc-500">订单编号</span><p className="font-mono font-medium">
                 <Link href={`/sales/orders/${bId}`} className="text-blue-600 hover:underline dark:text-blue-400">
-                  {orderInfo.order_no as string}
+                  {orderInfo.order_no}
                 </Link>
               </p></div>
-              <div><span className="text-zinc-500">客户</span><p>{(orderInfo.customer as {name?: string})?.name ?? "-"}</p></div>
-              <div><span className="text-zinc-500">计费方式</span><p>{PRICING_LABELS[orderInfo.pricing_mode as string] ?? String(orderInfo.pricing_mode)}</p></div>
-              <div><span className="text-zinc-500">计划租期</span><p>{orderInfo.planned_start_at ? `${formatDate(orderInfo.planned_start_at as string)} ~ ${formatDate(orderInfo.planned_end_at as string)}` : "-"}</p></div>
+              <div><span className="text-zinc-500">客户</span><p>{orderInfo.customer?.name ?? "-"}</p></div>
+              <div><span className="text-zinc-500">计费方式</span><p>{PRICING_LABELS[orderInfo.pricing_mode] ?? orderInfo.pricing_mode}</p></div>
+              <div><span className="text-zinc-500">计划租期</span><p>{orderInfo.planned_start_at ? `${formatDate(orderInfo.planned_start_at)} ~ ${formatDate(orderInfo.planned_end_at)}` : "-"}</p></div>
               <div><span className="text-zinc-500">租金总额</span><p className="font-semibold">{formatCurrency(orderInfo.total_rent_amount)}</p></div>
               <div><span className="text-zinc-500">押金</span><p>{formatCurrency(orderInfo.total_deposit_amount)}</p></div>
             </div>
@@ -265,8 +284,8 @@ export default async function ApprovalDetailPage({
                   <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
                     {orderItems.map((item) => (
                       <tr key={item.id as string}>
-                        <td className="py-1.5">{(item.equipment as {name?: string})?.name ?? "-"}</td>
-                        <td className="py-1.5 text-right">{item.quantity as string}</td>
+                        <td className="py-1.5">{item.equipment?.name ?? "-"}</td>
+                        <td className="py-1.5 text-right">{item.quantity}</td>
                         <td className="py-1.5 text-right tabular-nums">{formatCurrency(item.actual_unit_price)}</td>
                         <td className="py-1.5 text-right tabular-nums font-medium">{formatCurrency(item.rent_amount)}</td>
                       </tr>
@@ -314,56 +333,6 @@ export default async function ApprovalDetailPage({
       </div>
     </DirectionalTransition>
   );
-}
-
-// ══════════════════════════════════════════════════════════════════════
-// Business info card helper
-// ══════════════════════════════════════════════════════════════════════
-
-function businessInfoRow(
-  businessType: string,
-  businessId: string
-): { label: string; value: React.ReactNode } {
-  if (
-    ["ORDER_CREATE", "ORDER_MODIFY", "ORDER_TERMINATE"].includes(businessType)
-  ) {
-    // For simplicity, show the core field — a future enhancement can
-    // fetch the order/contract name by ID when a dedicated join helper exists
-    return {
-      label: "业务编号",
-      value: (
-        <Link
-          href={`/sales/orders/${businessId}`}
-          className="font-mono text-sm text-blue-600 hover:underline dark:text-blue-400"
-        >
-          {businessId}
-        </Link>
-      ),
-    };
-  }
-
-  if (businessType === "CONTRACT_SIGN") {
-    return {
-      label: "合同编号",
-      value: (
-        <Link
-          href={`/sales/contracts/${businessId}`}
-          className="font-mono text-sm text-blue-600 hover:underline dark:text-blue-400"
-        >
-          {businessId}
-        </Link>
-      ),
-    };
-  }
-
-  return {
-    label: "业务编号",
-    value: (
-      <span className="font-mono text-xs text-zinc-600 dark:text-zinc-400">
-        {businessId}
-      </span>
-    ),
-  };
 }
 
 // ══════════════════════════════════════════════════════════════════════

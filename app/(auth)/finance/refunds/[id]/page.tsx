@@ -17,6 +17,41 @@ const STATUS_VARIANTS: Record<string, "success" | "warning" | "danger" | "info" 
   PENDING_APPROVAL: "warning", APPROVED: "info", REJECTED: "danger", REFUNDED: "success",
 };
 
+type CurrencyAmount = string | number;
+
+type DepositSnapshot = {
+  deposit_no: string;
+  amount: CurrencyAmount;
+  paid_amount: CurrencyAmount;
+  deducted_amount: CurrencyAmount;
+  refunded_amount: CurrencyAmount;
+  available_amount: CurrencyAmount;
+};
+
+type RefundDetail = {
+  id: string;
+  refund_no: string;
+  customer_id: string;
+  order_id: string | null;
+  contract_id: string | null;
+  refund_amount: CurrencyAmount;
+  refund_method: string;
+  refund_status: string;
+  reason: string | null;
+  customer: { name: string } | null;
+  order: { order_no: string } | null;
+  contract: { contract_no: string } | null;
+  deposit: DepositSnapshot | null;
+};
+
+type ApprovalRow = {
+  id: string;
+  approval_no: string;
+  applicant: { display_name?: string } | null;
+  status: string;
+  created_at: string;
+};
+
 export default async function RefundDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -28,12 +63,12 @@ export default async function RefundDetailPage({ params }: { params: Promise<{ i
     .single();
   if (!raw) notFound();
 
-  const refund = raw as Record<string, unknown>;
-  const customer = refund.customer as { name: string } | null;
-  const order = refund.order as { order_no: string } | null;
-  const contract = refund.contract as { contract_no: string } | null;
-  const deposit = refund.deposit as Record<string, unknown> | null;
-  const status = refund.refund_status as string;
+  const refund = raw as unknown as RefundDetail;
+  const customer = refund.customer;
+  const order = refund.order;
+  const contract = refund.contract;
+  const deposit = refund.deposit;
+  const status = refund.refund_status;
 
   // Approval history
   const { data: approvals } = await supabase
@@ -43,14 +78,16 @@ export default async function RefundDetailPage({ params }: { params: Promise<{ i
     .eq("business_id", id)
     .order("created_at", { ascending: false });
 
-  const approvalColumns: Column<Record<string, unknown>>[] = [
-    { id: "no", header: "编号", cell: (a) => <span className="font-mono text-xs">{a.approval_no as string}</span> },
-    { id: "applicant", header: "申请人", cell: (a) => ((a.applicant as { display_name?: string } | null)?.display_name ?? "-") },
+  const approvalRows = (approvals ?? []) as unknown as ApprovalRow[];
+
+  const approvalColumns: Column<ApprovalRow>[] = [
+    { id: "no", header: "编号", cell: (a) => <span className="font-mono text-xs">{a.approval_no}</span> },
+    { id: "applicant", header: "申请人", cell: (a) => a.applicant?.display_name ?? "-" },
     { id: "status", header: "状态", cell: (a) => {
-      const s = a.status as string;
+      const s = a.status;
       return <Badge variant={s === "APPROVED" ? "success" : s === "REJECTED" ? "danger" : "warning"}>{s}</Badge>;
     }},
-    { id: "time", header: "时间", cell: (a) => formatDateTime(a.created_at as string) },
+    { id: "time", header: "时间", cell: (a) => formatDateTime(a.created_at) },
   ];
 
   return (
@@ -71,11 +108,11 @@ export default async function RefundDetailPage({ params }: { params: Promise<{ i
       <Card>
         <CardHeader><CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" />退款信息</CardTitle></CardHeader>
         <InfoGrid items={[
-          { label: "退款编号", value: refund.refund_no as string },
+          { label: "退款编号", value: refund.refund_no },
           { label: "客户", value: customer ? <Link href={`/sales/customers/${refund.customer_id}`} className="text-blue-600 hover:underline">{customer.name}</Link> : "-" },
           { label: "退款金额", value: <span className="font-semibold">{formatCurrency(refund.refund_amount)}</span> },
-          { label: "退款方式", value: refund.refund_method as string },
-          { label: "退款原因", value: (refund.reason as string) ?? "-" },
+          { label: "退款方式", value: refund.refund_method },
+          { label: "退款原因", value: refund.reason ?? "-" },
           { label: "订单", value: order ? <Link href={`/sales/orders/${refund.order_id}`} className="text-blue-600 hover:underline">{order.order_no}</Link> : "-" },
           { label: "合同", value: contract ? <Link href={`/sales/contracts/${refund.contract_id}`} className="text-blue-600 hover:underline">{contract.contract_no}</Link> : "-" },
         ]} />
@@ -96,8 +133,8 @@ export default async function RefundDetailPage({ params }: { params: Promise<{ i
       )}
 
       <Card>
-        <CardHeader><CardTitle className="flex items-center gap-2"><CreditCard className="h-4 w-4" />审批记录 ({(approvals ?? []).length})</CardTitle></CardHeader>
-        <DataTable columns={approvalColumns} data={(approvals ?? []) as Record<string, unknown>[]} keyExtractor={(a) => a.id as string} emptyMessage="暂无审批记录" />
+        <CardHeader><CardTitle className="flex items-center gap-2"><CreditCard className="h-4 w-4" />审批记录 ({approvalRows.length})</CardTitle></CardHeader>
+        <DataTable columns={approvalColumns} data={approvalRows} keyExtractor={(a) => a.id} emptyMessage="暂无审批记录" />
       </Card>
     </div>
   );

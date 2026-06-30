@@ -310,12 +310,12 @@ export async function rejectRequest(
     .eq("business_id", approval.business_id);
 
   await createNotification({
-    recipientId: request.applicant_id,
+    recipientId: approval.applicant_id,
     type: "APPROVAL_RESULT",
-    title: "审批结果: " + request.title,
+    title: "审批结果: " + approval.title,
     content: "您的审批申请已被驳回" + (reason ? "：" + reason : ""),
-    businessType: request.business_type,
-    businessId: request.business_id,
+    businessType: approval.business_type,
+    businessId: approval.business_id,
   });
 
   revalidatePath("/approval/pending");

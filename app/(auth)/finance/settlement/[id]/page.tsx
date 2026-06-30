@@ -15,6 +15,7 @@ interface InspectionFull {
   inspection_no: string;
   order_id: string | null;
   contract_id: string | null;
+  customer_id: string;
   inspected_at: string;
   is_overdue: boolean;
   overdue_days: number | null;
@@ -87,7 +88,7 @@ async function calculatePreview(
   // All receivables for this contract (including PAID ones — for early return refund)
   const { data: allReceivables } = await supabase
     .from("receivable")
-    .select("amount, paid_amount, unpaid_amount, status")
+    .select("amount, paid_amount, unpaid_amount, status, receivable_type")
     .eq("contract_id", inspection.contract_id);
 
   // Unpaid rent
@@ -99,7 +100,6 @@ async function calculatePreview(
   const rentReceivables = (allReceivables ?? [])
     .filter(r => (r.status as string) !== "DEPOSIT" && r.receivable_type !== "DEPOSIT");
   const totalRentPaid = rentReceivables.reduce((s, r) => s + parseFloat(r.paid_amount as string), 0);
-  const totalRentAmount = rentReceivables.reduce((s, r) => s + parseFloat(r.amount as string), 0);
 
   // Calculate prorated rent for actual usage period
   const contractTotalRent = contract ? parseFloat(contract.total_rent_amount) : 0;

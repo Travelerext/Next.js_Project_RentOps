@@ -76,7 +76,7 @@ async function calculateSettlement(
   // 2. All receivables (including PAID for early return calculation)
   const { data: allReceivables } = await supabase
     .from("receivable")
-    .select("amount, paid_amount, unpaid_amount, status")
+    .select("amount, paid_amount, unpaid_amount, status, receivable_type")
     .eq("contract_id", inspection.contract_id);
 
   // Unpaid rent
@@ -88,7 +88,6 @@ async function calculateSettlement(
   const rentReceivables = (allReceivables ?? [])
     .filter(r => r.receivable_type !== "DEPOSIT");
   const totalRentPaid = rentReceivables.reduce((s, r) => s + parseFloat(r.paid_amount as string), 0);
-  const totalRentAmount = rentReceivables.reduce((s, r) => s + parseFloat(r.amount as string), 0);
   let overpaidRent = 0;
   if (totalRentPaid > 0) {
     const contractTotalRent = parseFloat(contract.total_rent_amount as string);
