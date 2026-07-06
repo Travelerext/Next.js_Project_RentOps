@@ -25,6 +25,10 @@ jobs:
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "placeholder"
           SUPABASE_SERVICE_ROLE_KEY: "placeholder"
           DATABASE_URL: "postgresql://placeholder"
+          DEEPSEEK_API_KEY: "placeholder"
+          DEEPSEEK_API_URL: "https://api.deepseek.com/chat/completions"
+          DEEPSEEK_MODEL: "deepseek-v4-flash"
+          DEEPSEEK_TIMEOUT_MS: "25000"
 
   deploy:
     name: Deploy to ECS
@@ -51,12 +55,16 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          DEEPSEEK_API_URL: ${{ secrets.DEEPSEEK_API_URL || vars.DEEPSEEK_API_URL || 'https://api.deepseek.com/chat/completions' }}
+          DEEPSEEK_MODEL: ${{ secrets.DEEPSEEK_MODEL || vars.DEEPSEEK_MODEL || 'deepseek-v4-flash' }}
+          DEEPSEEK_TIMEOUT_MS: ${{ secrets.DEEPSEEK_TIMEOUT_MS || vars.DEEPSEEK_TIMEOUT_MS || '25000' }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          envs: NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,SUPABASE_SERVICE_ROLE_KEY
+          envs: NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,SUPABASE_SERVICE_ROLE_KEY,DEEPSEEK_API_KEY,DEEPSEEK_API_URL,DEEPSEEK_MODEL,DEEPSEEK_TIMEOUT_MS
           script: |
             set -e
 
@@ -68,6 +76,10 @@ jobs:
             NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
             SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+            DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+            DEEPSEEK_API_URL=${DEEPSEEK_API_URL}
+            DEEPSEEK_MODEL=${DEEPSEEK_MODEL}
+            DEEPSEEK_TIMEOUT_MS=${DEEPSEEK_TIMEOUT_MS}
             ENVEOF
 
             echo "🔧 Injecting env vars into PM2 config..."
