@@ -13,6 +13,23 @@ type AuthContext = {
   primaryRole: string;
 };
 
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
+type NotificationLevel = "INFO" | "SUCCESS" | "WARNING" | "ERROR" | "URGENT";
+
+type NotificationPayload = {
+  type: string;
+  title: string;
+  content: string;
+  businessType: string;
+  businessId: string;
+  actionUrl?: string;
+  level?: NotificationLevel;
+  dedupeKey?: string;
+  sourceEvent?: string;
+  sourceModule?: string;
+};
+
 const EQUIPMENT_ROLES = ["SYSTEM_ADMIN", "EQUIPMENT_MANAGER", "EQUIPMENT_SUPERVISOR"] as const;
 const MAINTENANCE_ROLES = ["SYSTEM_ADMIN", "MAINTENANCE", "MAINTENANCE_SUPERVISOR"] as const;
 const SALES_ROLES = ["SYSTEM_ADMIN", "SALES", "SALES_MANAGER"] as const;
@@ -70,6 +87,135 @@ async function currentCustomerId(profileId: string): Promise<string | null> {
     .eq("owner_user_id", profileId)
     .maybeSingle();
   return (data?.id as string | undefined) ?? null;
+}
+
+async function existingDedupeKeys(supabase: SupabaseClient, keys: string[]) {
+  if (keys.length === 0) return new Set<string>();
+  const { data } = await supabase.from("notification").select("dedupe_key").in("dedupe_key", keys);
+  return new Set((data ?? []).map((row) => row.dedupe_key as string).filter(Boolean));
+}
+
+async function notifyRoles(
+  supabase: SupabaseClient,
+  roles: readonly string[],
+  payload: NotificationPayload
+) {
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id")
+    .in("primary_role", roles)
+    .eq("account_status", "ACTIVE")
+    .eq("login_enabled", true);
+
+  const rows = (profiles ?? []).map((profile) => {
+    const dedupeKey = payload.dedupeKey ? `${payload.dedupeKey}:${profile.id}` : null;
+    return {
+      recipient_id: profile.id,
+      notification_type: payload.type,
+      type: payload.type,
+      title: payload.title,
+      content: payload.content,
+      business_type: payload.businessType,
+      business_id: payload.businessId,
+      action_url: payload.actionUrl ?? null,
+      level: payload.level ?? "INFO",
+      dedupe_key: dedupeKey,
+      source_event: payload.sourceEvent ?? "SERVER_ACTION",
+      source_module: payload.sourceModule ?? "OPERATIONS",
+    };
+  });
+
+  const dedupeKeys = rows.map((row) => row.dedupe_key).filter((key): key is string => Boolean(key));
+  const existing = await existingDedupeKeys(supabase, dedupeKeys);
+  const insertRows = rows.filter((row) => !row.dedupe_key || !existing.has(row.dedupe_key));
+  if (insertRows.length > 0) await supabase.from("notification").insert(insertRows);
+}
+
+async function notifyCustomerOwner(
+  supabase: SupabaseClient,
+  customerId: string,
+  payload: NotificationPayload
+) {
+  const { data: customer } = await supabase
+    .from("customer")
+    .select("owner_user_id")
+    .eq("id", customerId)
+    .maybeSingle();
+  if (!customer?.owner_user_id) return;
+
+  const dedupeKey = payload.dedupeKey ? `${payload.dedupeKey}:${customer.owner_user_id}` : null;
+  if (dedupeKey) {
+    const existing = await existingDedupeKeys(supabase, [dedupeKey]);
+    if (existing.has(dedupeKey)) return;
+  }
+
+  await supabase.from("notification").insert({
+    recipient_id: customer.owner_user_id,
+    notification_type: payload.type,
+    type: payload.type,
+    title: payload.title,
+    content: payload.content,
+    business_type: payload.businessType,
+    business_id: payload.businessId,
+    action_url: payload.actionUrl ?? null,
+    level: payload.level ?? "INFO",
+    dedupe_key: dedupeKey,
+    source_event: payload.sourceEvent ?? "SERVER_ACTION",
+    source_module: payload.sourceModule ?? "OPERATIONS",
+  });
+}
+
+function monthsBetweenInclusive(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T00:00:00Z`);
+  const end = new Date(`${endDate}T00:00:00Z`);
+  const months = (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + end.getUTCMonth() - start.getUTCMonth() + 1;
+  return Math.max(1, months);
+}
+
+function addMonths(dateString: string, offset: number) {
+  const date = new Date(`${dateString}T00:00:00Z`);
+  date.setUTCDate(1);
+  date.setUTCMonth(date.getUTCMonth() + offset);
+  return date.toISOString().slice(0, 10);
+}
+
+async function refreshInsuranceCostAllocations(
+  supabase: SupabaseClient,
+  policy: { id: string; equipment_id: string; premium_amount: number | string; start_date: string; end_date: string }
+) {
+  await supabase.from("equipment_insurance_cost_allocation").delete().eq("policy_id", policy.id);
+
+  const months = monthsBetweenInclusive(policy.start_date, policy.end_date);
+  const amount = Math.round((Number(policy.premium_amount ?? 0) / months) * 100) / 100;
+  const rows = Array.from({ length: months }, (_, index) => ({
+    policy_id: policy.id,
+    equipment_id: policy.equipment_id,
+    allocation_month: addMonths(policy.start_date, index),
+    amount,
+  }));
+  if (rows.length > 0) await supabase.from("equipment_insurance_cost_allocation").insert(rows);
+}
+
+async function notifyInsuranceExpiryIfNeeded(
+  supabase: SupabaseClient,
+  policy: { id: string; policy_no: string; status: string; end_date: string }
+) {
+  if (policy.status !== "ACTIVE") return;
+  const today = new Date();
+  const endDate = new Date(`${policy.end_date}T00:00:00Z`);
+  const days = Math.ceil((endDate.getTime() - Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())) / 86400000);
+  if (days > 30) return;
+
+  await notifyRoles(supabase, [...EQUIPMENT_ROLES, ...FINANCE_ROLES], {
+    type: days < 0 ? "INSURANCE_EXPIRED" : "INSURANCE_EXPIRING",
+    title: days < 0 ? "设备保险已过期" : "设备保险即将到期",
+    content: `保单 ${policy.policy_no} 到期日为 ${policy.end_date}。`,
+    businessType: "INSURANCE_POLICY",
+    businessId: policy.id,
+    actionUrl: `/finance/insurance/${policy.id}`,
+    level: days < 0 ? "ERROR" : "WARNING",
+    dedupeKey: `insurance-expiry:${policy.id}:${policy.end_date}`,
+  });
 }
 
 export async function bindIotTerminal(formData: FormData): Promise<ActionResult<{ id: string }>> {
@@ -388,6 +534,16 @@ export async function submitRentalInquiry(formData: FormData): Promise<ActionRes
     estimated_amount: amount,
   });
 
+  await notifyRoles(supabase, SALES_ROLES, {
+    type: "CUSTOMER_INQUIRY_SUBMITTED",
+    title: "客户提交租赁意向",
+    content: "客户提交了新的租赁意向，请及时跟进。",
+    businessType: "RENTAL_INQUIRY",
+    businessId: data.id,
+    actionUrl: `/sales/inquiries/${data.id}`,
+    dedupeKey: `inquiry-submitted:${data.id}`,
+  });
+
   revalidatePath("/customer/inquiries");
   revalidatePath("/sales/inquiries");
   if (formData.has("redirectTo")) redirectAfter(formData, `/customer/inquiries`);
@@ -508,15 +664,53 @@ export async function markSignTaskSigned(formData: FormData): Promise<ActionResu
   if ("error" in auth) return { success: false, error: auth.error };
 
   const taskId = str(formData, "taskId");
-  const { error } = await supabase
+  const signedFileUrl = nullableStr(formData, "signedFileUrl");
+  const { data: task, error } = await supabase
     .from("contract_sign_task")
     .update({
       status: "SIGNED",
-      signed_file_url: nullableStr(formData, "signedFileUrl"),
+      signed_file_url: signedFileUrl,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", taskId);
+    .eq("id", taskId)
+    .select("contract_id")
+    .single();
   if (error) return { success: false, error: error.message };
+
+  const contractPatch: Record<string, unknown> = {
+    contract_status: "SIGNED",
+    signed_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  if (signedFileUrl) contractPatch.contract_file_path = signedFileUrl;
+
+  const { data: contract } = await supabase
+    .from("rental_contract")
+    .update(contractPatch)
+    .eq("id", task.contract_id)
+    .select("contract_no, sales_user_id")
+    .single();
+
+  if (contract?.sales_user_id) {
+    const dedupeKey = `contract-signed:${task.contract_id}:${contract.sales_user_id}`;
+    const existing = await existingDedupeKeys(supabase, [dedupeKey]);
+    if (!existing.has(dedupeKey)) {
+      await supabase.from("notification").insert({
+        recipient_id: contract.sales_user_id,
+        notification_type: "CONTRACT_SIGN_COMPLETED",
+        type: "CONTRACT_SIGN_COMPLETED",
+        title: "合同签署完成",
+        content: `合同 ${contract.contract_no ?? ""} 已完成电子签署。`,
+        business_type: "CONTRACT",
+        business_id: task.contract_id,
+        action_url: `/sales/contracts/${task.contract_id}`,
+        level: "SUCCESS",
+        dedupe_key: dedupeKey,
+        source_event: "SERVER_ACTION",
+        source_module: "OPERATIONS",
+      });
+    }
+  }
 
   revalidatePath("/customer/contracts");
   revalidatePath("/sales/contracts");
@@ -569,6 +763,16 @@ export async function submitPaymentVoucher(formData: FormData): Promise<ActionRe
     .single();
   if (error) return { success: false, error: error.message };
 
+  await notifyRoles(supabase, FINANCE_ROLES, {
+    type: "PAYMENT_VOUCHER_SUBMITTED",
+    title: "客户提交付款凭证",
+    content: `客户提交了付款凭证，金额 ${amount}。`,
+    businessType: "PAYMENT_VOUCHER",
+    businessId: data.id,
+    actionUrl: "/finance/payments",
+    dedupeKey: `voucher-submitted:${data.id}`,
+  });
+
   revalidatePath("/customer/bills");
   revalidatePath("/finance/payments");
   if (formData.has("redirectTo")) redirectAfter(formData, "/customer/bills");
@@ -582,17 +786,31 @@ export async function reviewPaymentVoucher(formData: FormData): Promise<ActionRe
   if (!hasRole(auth.primaryRole, FINANCE_ROLES)) return { success: false, error: "无权审核付款凭证" };
 
   const voucherId = str(formData, "voucherId");
-  const { error } = await supabase
+  const status = str(formData, "status", "APPROVED");
+  const { data: voucher, error } = await supabase
     .from("payment_voucher")
     .update({
-      status: str(formData, "status", "APPROVED"),
+      status,
       review_comment: nullableStr(formData, "reviewComment"),
       reviewed_by: auth.profileId,
       reviewed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .eq("id", voucherId);
+    .eq("id", voucherId)
+    .select("id, customer_id, voucher_no")
+    .single();
   if (error) return { success: false, error: error.message };
+
+  await notifyCustomerOwner(supabase, voucher.customer_id, {
+    type: `PAYMENT_VOUCHER_${status}`,
+    title: "付款凭证状态更新",
+    content: `您的付款凭证 ${voucher.voucher_no ?? ""} 状态已更新。`,
+    businessType: "PAYMENT_VOUCHER",
+    businessId: voucher.id,
+    actionUrl: "/customer/bills",
+    level: status === "REJECTED" ? "WARNING" : "SUCCESS",
+    dedupeKey: `voucher-status:${voucher.id}:${status}`,
+  });
 
   revalidatePath("/finance/payments");
   revalidatePath("/customer/bills");
@@ -614,10 +832,11 @@ export async function submitCustomerRepair(formData: FormData): Promise<ActionRe
     .map((url) => url.trim())
     .filter(Boolean);
 
+  const requestNo = generateNo("RR");
   const { data, error } = await supabase
     .from("customer_repair_request")
     .insert({
-      request_no: generateNo("RR"),
+      request_no: requestNo,
       customer_id: customerId,
       equipment_id: str(formData, "equipmentId"),
       fault_description: str(formData, "faultDescription"),
@@ -628,6 +847,40 @@ export async function submitCustomerRepair(formData: FormData): Promise<ActionRe
     .select("id")
     .single();
   if (error) return { success: false, error: error.message };
+
+  const { data: workOrder, error: workOrderError } = await supabase
+    .from("maintenance_work_order")
+    .insert({
+      work_order_no: generateNo("WO"),
+      equipment_id: str(formData, "equipmentId"),
+      customer_id: customerId,
+      reported_by: auth.profileId,
+      fault_description: str(formData, "faultDescription"),
+      fault_level: "NORMAL",
+      status: "PENDING_DISPATCH",
+      photo_paths: photoUrls,
+      remark: "客户 Portal 报修生成",
+      created_by: auth.profileId,
+    })
+    .select("id")
+    .single();
+  if (workOrderError) return { success: false, error: workOrderError.message };
+
+  await supabase
+    .from("customer_repair_request")
+    .update({ work_order_id: workOrder.id, status: "DISPATCHING", updated_at: new Date().toISOString() })
+    .eq("id", data.id);
+
+  await notifyRoles(supabase, ["MAINTENANCE_SUPERVISOR"], {
+    type: "CUSTOMER_REPAIR_SUBMITTED",
+    title: "客户提交报修",
+    content: `客户提交了报修单 ${requestNo}，系统已生成待派单工单。`,
+    businessType: "CUSTOMER_REPAIR",
+    businessId: data.id,
+    actionUrl: `/maintenance/work-orders/${workOrder.id}`,
+    level: "WARNING",
+    dedupeKey: `customer-repair:${data.id}`,
+  });
 
   revalidatePath("/customer/repairs");
   revalidatePath("/maintenance/work-orders");
@@ -658,9 +911,12 @@ export async function createInsurancePolicy(formData: FormData): Promise<ActionR
       created_by: auth.profileId,
       updated_by: auth.profileId,
     })
-    .select("id")
+    .select("id, policy_no, equipment_id, premium_amount, start_date, end_date, status")
     .single();
   if (error) return { success: false, error: error.message };
+
+  await refreshInsuranceCostAllocations(supabase, data);
+  await notifyInsuranceExpiryIfNeeded(supabase, data);
 
   revalidatePath("/finance/insurance");
   if (formData.has("redirectTo")) redirectAfter(formData, `/finance/insurance/${data.id}`);
@@ -674,7 +930,7 @@ export async function updateInsurancePolicy(formData: FormData): Promise<ActionR
   if (!hasRole(auth.primaryRole, FINANCE_ROLES)) return { success: false, error: "无权维护保险保单" };
 
   const policyId = str(formData, "policyId");
-  const { error } = await supabase
+  const { data: policy, error } = await supabase
     .from("equipment_insurance_policy")
     .update({
       insurer_name: str(formData, "insurerName"),
@@ -689,8 +945,13 @@ export async function updateInsurancePolicy(formData: FormData): Promise<ActionR
       updated_by: auth.profileId,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", policyId);
+    .eq("id", policyId)
+    .select("id, policy_no, equipment_id, premium_amount, start_date, end_date, status")
+    .single();
   if (error) return { success: false, error: error.message };
+
+  await refreshInsuranceCostAllocations(supabase, policy);
+  await notifyInsuranceExpiryIfNeeded(supabase, policy);
 
   revalidatePath("/finance/insurance");
   revalidatePath(`/finance/insurance/${policyId}`);
@@ -727,6 +988,16 @@ export async function createInsuranceClaim(formData: FormData): Promise<ActionRe
     .single();
   if (error) return { success: false, error: error.message };
 
+  await notifyRoles(supabase, [...FINANCE_ROLES, ...EQUIPMENT_ROLES], {
+    type: "INSURANCE_CLAIM_CREATED",
+    title: "新增保险理赔",
+    content: "新增了一条设备保险理赔，请跟进处理。",
+    businessType: "INSURANCE_CLAIM",
+    businessId: data.id,
+    actionUrl: `/finance/insurance/claims/${data.id}`,
+    dedupeKey: `claim-created:${data.id}`,
+  });
+
   revalidatePath("/finance/insurance/claims");
   if (formData.has("redirectTo")) redirectAfter(formData, `/finance/insurance/claims/${data.id}`);
   return { success: true, data: { id: data.id as string } };
@@ -739,17 +1010,30 @@ export async function updateInsuranceClaimStatus(formData: FormData): Promise<Ac
   if (!hasRole(auth.primaryRole, FINANCE_ROLES)) return { success: false, error: "无权更新理赔状态" };
 
   const claimId = str(formData, "claimId");
-  const { error } = await supabase
+  const status = str(formData, "status", "SUBMITTED");
+  const { data: claim, error } = await supabase
     .from("equipment_insurance_claim")
     .update({
-      status: str(formData, "status", "SUBMITTED"),
+      status,
       paid_amount: num(formData, "paidAmount"),
       remark: nullableStr(formData, "remark"),
       updated_by: auth.profileId,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", claimId);
+    .eq("id", claimId)
+    .select("id, claim_no")
+    .single();
   if (error) return { success: false, error: error.message };
+
+  await notifyRoles(supabase, [...FINANCE_ROLES, ...EQUIPMENT_ROLES], {
+    type: "INSURANCE_CLAIM_UPDATED",
+    title: "保险理赔状态更新",
+    content: `理赔单 ${claim.claim_no ?? ""} 状态已更新为 ${status}。`,
+    businessType: "INSURANCE_CLAIM",
+    businessId: claim.id,
+    actionUrl: `/finance/insurance/claims/${claim.id}`,
+    dedupeKey: `claim-status:${claim.id}:${status}`,
+  });
 
   revalidatePath("/finance/insurance/claims");
   revalidatePath(`/finance/insurance/claims/${claimId}`);
@@ -829,6 +1113,45 @@ export async function generateUtilizationSnapshot(formData: FormData): Promise<A
   revalidatePath(`/equipment/catalog/${equipmentId}/utilization`);
   if (formData.has("redirectTo")) redirectAfter(formData, `/equipment/catalog/${equipmentId}/utilization`);
   return { success: true, data: { id: data.id as string } };
+}
+
+export async function syncCustomerRepairFromWorkOrder(
+  workOrderId: string,
+  workOrderStatus: string
+): Promise<void> {
+  const statusMap: Record<string, string> = {
+    PENDING_DISPATCH: "DISPATCHING",
+    ASSIGNED: "DISPATCHED",
+    IN_PROGRESS: "IN_PROGRESS",
+    COMPLETED: "COMPLETED",
+    VERIFIED: "COMPLETED",
+    CLOSED: "CLOSED",
+    CANCELLED: "CANCELLED",
+  };
+  const repairStatus = statusMap[workOrderStatus];
+  if (!repairStatus) return;
+
+  const supabase = await createClient();
+  const { data: repair } = await supabase
+    .from("customer_repair_request")
+    .update({ status: repairStatus, updated_at: new Date().toISOString() })
+    .eq("work_order_id", workOrderId)
+    .select("id, request_no, customer_id")
+    .maybeSingle();
+  if (!repair) return;
+
+  if (["COMPLETED", "CLOSED", "CANCELLED"].includes(repairStatus)) {
+    await notifyCustomerOwner(supabase, repair.customer_id, {
+      type: `CUSTOMER_REPAIR_${repairStatus}`,
+      title: "报修进度更新",
+      content: `您的报修单 ${repair.request_no ?? ""} 状态已更新。`,
+      businessType: "CUSTOMER_REPAIR",
+      businessId: repair.id,
+      actionUrl: `/customer/repairs/${repair.id}`,
+      level: repairStatus === "CANCELLED" ? "WARNING" : "SUCCESS",
+      dedupeKey: `customer-repair-status:${repair.id}:${repairStatus}`,
+    });
+  }
 }
 
 async function actionToForm<T>(action: (formData: FormData) => Promise<ActionResult<T>>, formData: FormData): Promise<void> {

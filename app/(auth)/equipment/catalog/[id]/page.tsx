@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/layout/page-header";
 import { InfoGrid } from "@/components/data/info-grid";
@@ -9,7 +9,7 @@ import { formatDate, formatCurrency } from "@/lib/utils";
 import { EQUIPMENT_STATUS } from "@/lib/constants";
 import Link from "next/link";
 import { DirectionalTransition } from "@/components/layout/directional-transition";
-import { ALERT_STATUS, HEALTH_LEVEL, statusVariant as cr08StatusVariant, pct } from "@/lib/cr08-labels";
+import { ALERT_STATUS, HEALTH_LEVEL, statusVariant as operationStatusVariant, pct } from "@/lib/operation-labels";
 
 export default async function EquipmentDetailPage({
   params,
@@ -161,7 +161,7 @@ export default async function EquipmentDetailPage({
               {
                 label: "健康分",
                 value: latestHealth ? (
-                  <Badge variant={cr08StatusVariant(latestHealth.score_level as string)}>
+                  <Badge variant={operationStatusVariant(latestHealth.score_level as string)}>
                     {latestHealth.score as number} / {HEALTH_LEVEL[latestHealth.score_level as string] ?? latestHealth.score_level as string}
                   </Badge>
                 ) : "-",
@@ -184,7 +184,7 @@ export default async function EquipmentDetailPage({
               {alerts.map((alert: Record<string, unknown>) => (
                 <Link key={alert.id as string} href={`/equipment/alerts/${alert.id}`} className="flex items-center justify-between rounded-lg border border-app-border px-3 py-2 text-sm hover:bg-app-surface-muted">
                   <span className="font-medium text-app-fg">{alert.title as string}</span>
-                  <Badge variant={cr08StatusVariant(alert.status as string)}>{ALERT_STATUS[alert.status as string] ?? alert.status as string}</Badge>
+                  <Badge variant={operationStatusVariant(alert.status as string)}>{ALERT_STATUS[alert.status as string] ?? alert.status as string}</Badge>
                 </Link>
               ))}
             </div>

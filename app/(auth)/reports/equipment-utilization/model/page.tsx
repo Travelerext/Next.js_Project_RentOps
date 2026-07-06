@@ -1,8 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { DataPage } from "@/components/data/data-page";
 import { DataTable, type Column } from "@/components/data/data-table";
 import { formatCurrency } from "@/lib/utils";
-import { pct } from "@/lib/cr08-labels";
+import { pct } from "@/lib/operation-labels";
 
 export default async function UtilizationByModelPage() {
   const supabase = await createClient();

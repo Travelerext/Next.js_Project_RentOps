@@ -1,53 +1,79 @@
-#!/bin/bash
-# ═══════════════════════════════════════════════════════════════════
-# RentOps — Alibaba Cloud ECS 服务器初始化脚本
-# 首次部署前在服务器上以 root 身份运行:
-#   chmod +x setup-server.sh && sudo ./setup-server.sh
-# ═══════════════════════════════════════════════════════════════════
-set -e
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
-APP_USER="${APP_USER:-www-data}"
+# RentOps Alibaba Cloud ECS setup script.
+#
+# Run on a fresh Ubuntu/Debian server as root:
+#   chmod +x scripts/setup-server.sh
+#   sudo APP_USER=<your-ssh-user> DEPLOY_PATH=/opt/rentops scripts/setup-server.sh
+#
+# The script installs runtime dependencies and prepares the deploy directory.
+# It does not run database migrations automatically. Use `rentops-migrate`
+# after the app files and .env have been deployed.
+
+APP_USER="${APP_USER:-${SUDO_USER:-rentops}}"
+if [ "$APP_USER" = "root" ]; then
+  APP_USER="rentops"
+fi
+
 DEPLOY_PATH="${DEPLOY_PATH:-/opt/rentops}"
 NODE_VERSION="${NODE_VERSION:-20}"
+SUPABASE_CLI_VERSION="${SUPABASE_CLI_VERSION:-latest}"
 
-echo "╔════════════════════════════════════════════════╗"
-echo "║  RentOps — Server Setup (IP Mode)             ║"
-echo "╚════════════════════════════════════════════════╝"
+require_root() {
+  if [ "$(id -u)" -ne 0 ]; then
+    echo "This script must be run as root. Try: sudo APP_USER=$APP_USER $0"
+    exit 1
+  fi
+}
 
-# ── 1. Install Node.js ───────────────────────────────────────────
-echo ""
-echo "━━━ [1/6] Installing Node.js $NODE_VERSION ━━━"
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
 
-if ! command -v node &>/dev/null; then
-  curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | bash -
+section() {
+  echo ""
+  echo "==> $1"
+}
+
+require_root
+
+echo "RentOps server setup"
+echo "App user:    $APP_USER"
+echo "Deploy path: $DEPLOY_PATH"
+echo "Node.js:     $NODE_VERSION"
+
+section "Installing base packages"
+apt-get update
+apt-get install -y ca-certificates curl gnupg nginx ufw
+
+section "Preparing application user"
+if ! id "$APP_USER" >/dev/null 2>&1; then
+  useradd --create-home --shell /bin/bash "$APP_USER"
+fi
+
+section "Installing Node.js"
+if ! command_exists node || ! node -v | grep -q "^v${NODE_VERSION}\\."; then
+  curl -fsSL "https://deb.nodesource.com/setup_${NODE_VERSION}.x" | bash -
   apt-get install -y nodejs
 fi
+echo "Node.js $(node -v)"
+echo "npm $(npm -v)"
 
-echo "✅ Node.js $(node -v)"
-echo "✅ npm $(npm -v)"
-
-# ── 2. Install PM2 ───────────────────────────────────────────────
-echo ""
-echo "━━━ [2/6] Installing PM2 ━━━"
-
-if ! command -v pm2 &>/dev/null; then
+section "Installing PM2"
+if ! command_exists pm2; then
   npm install -g pm2
 fi
+echo "PM2 $(pm2 -v)"
 
-echo "✅ PM2 $(pm2 -v)"
-
-# ── 3. Install & configure Nginx ─────────────────────────────────
-echo ""
-echo "━━━ [3/6] Installing Nginx ━━━"
-
-if ! command -v nginx &>/dev/null; then
-  apt-get update
-  apt-get install -y nginx
+section "Installing Supabase CLI"
+if ! command_exists supabase; then
+  npm install -g "supabase@${SUPABASE_CLI_VERSION}"
 fi
+supabase --version
 
-# Nginx 反代 —— server_name _ 匹配所有请求（IP 或域名均可）
-cat > /etc/nginx/sites-available/rentops << 'NGINXEOF'
-# RentOps — IP-based reverse proxy
+section "Configuring Nginx reverse proxy"
+cat > /etc/nginx/sites-available/rentops <<'NGINXEOF'
 server {
     listen 80 default_server;
     server_name _;
@@ -68,53 +94,81 @@ server {
 }
 NGINXEOF
 
-ln -sf /etc/nginx/sites-available/rentops /etc/nginx/sites-enabled/
+ln -sf /etc/nginx/sites-available/rentops /etc/nginx/sites-enabled/rentops
 rm -f /etc/nginx/sites-enabled/default
+nginx -t
+systemctl enable nginx
+systemctl reload nginx
 
-nginx -t && systemctl reload nginx
-echo "✅ Nginx configured → :80 → :3000 (反代)"
-
-SERVER_IP=$(curl -s ifconfig.me 2>/dev/null || echo "YOUR_SERVER_IP")
-echo "   访问地址: http://${SERVER_IP}"
-
-# ── 4. Create deploy directory ───────────────────────────────────
-echo ""
-echo "━━━ [4/6] Creating deploy directory ━━━"
-
+section "Creating deploy directory"
 mkdir -p "$DEPLOY_PATH/logs"
 chown -R "${APP_USER}:${APP_USER}" "$DEPLOY_PATH"
-echo "✅ $DEPLOY_PATH"
 
-# ── 5. Configure PM2 startup ─────────────────────────────────────
-echo ""
-echo "━━━ [5/6] Configuring PM2 auto-start ━━━"
-
-pm2 startup systemd -u "$APP_USER" --hp "/home/$APP_USER" || true
-echo "✅ PM2 will start on boot"
-
-# ── 6. Firewall ──────────────────────────────────────────────────
-echo ""
-echo "━━━ [6/6] Configuring firewall ━━━"
-
-if command -v ufw &>/dev/null; then
-  ufw allow 80/tcp
-  ufw allow 443/tcp
-  ufw allow 22/tcp
-  ufw --force enable
-  echo "✅ Firewall: 80, 443, 22 allowed"
-else
-  echo "⚠️  ufw not found — 请确保阿里云安全组已放行 80 端口"
+if [ ! -f "$DEPLOY_PATH/.env.example" ]; then
+  cat > "$DEPLOY_PATH/.env.example" <<'ENVEOF'
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+DATABASE_URL=
+DEEPSEEK_API_KEY=
+DEEPSEEK_API_URL=https://api.deepseek.com/chat/completions
+DEEPSEEK_MODEL=deepseek-v4-flash
+DEEPSEEK_TIMEOUT_MS=25000
+ENVEOF
+  chown "${APP_USER}:${APP_USER}" "$DEPLOY_PATH/.env.example"
 fi
 
-# ── Done ──────────────────────────────────────────────────────────
-echo ""
-echo "╔════════════════════════════════════════════════╗"
-echo "║  ✅ Setup complete!                           ║"
-echo "║                                              ║"
-echo "║  访问地址: http://${SERVER_IP}               ║"
-echo "║  部署路径: $DEPLOY_PATH                      ║"
-echo "╚════════════════════════════════════════════════╝"
-echo ""
-echo "📋 Next steps:"
-echo "   1. 在阿里云安全组放行 80 端口 (如果还没放行)"
-echo "   2. 配置 GitHub Secrets 后 push main 触发部署"
+section "Installing migration helper"
+cat > /usr/local/bin/rentops-migrate <<'MIGRATEEOF'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+DEPLOY_PATH="${DEPLOY_PATH:-/opt/rentops}"
+ENV_FILE="${ENV_FILE:-$DEPLOY_PATH/.env}"
+
+if [ ! -d "$DEPLOY_PATH/supabase/migrations" ]; then
+  echo "Missing Supabase migrations directory: $DEPLOY_PATH/supabase/migrations"
+  exit 1
+fi
+
+DATABASE_URL="${DATABASE_URL:-}"
+if [ -z "$DATABASE_URL" ] && [ -f "$ENV_FILE" ]; then
+  DATABASE_URL="$(awk -F= '$1=="DATABASE_URL"{sub(/^[^=]*=/,""); print; exit}' "$ENV_FILE")"
+fi
+
+if [ -z "$DATABASE_URL" ]; then
+  echo "DATABASE_URL is required. Set it in the environment or in $ENV_FILE."
+  exit 1
+fi
+
+cd "$DEPLOY_PATH"
+supabase db push --db-url "$DATABASE_URL"
+MIGRATEEOF
+chmod +x /usr/local/bin/rentops-migrate
+
+section "Configuring PM2 startup"
+pm2 startup systemd -u "$APP_USER" --hp "/home/$APP_USER" || true
+
+section "Configuring firewall"
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw allow 22/tcp
+ufw --force enable
+
+SERVER_IP="$(curl -fsS ifconfig.me 2>/dev/null || echo YOUR_SERVER_IP)"
+
+cat <<EOF
+
+Setup complete.
+
+Server URL:  http://$SERVER_IP
+Deploy path: $DEPLOY_PATH
+App user:    $APP_USER
+
+Next steps:
+1. Configure GitHub Secrets, including DATABASE_URL.
+2. Deploy the app files to $DEPLOY_PATH.
+3. Apply database migrations when ready:
+   rentops-migrate
+4. Start or reload the app with PM2 after deployment.
+EOF

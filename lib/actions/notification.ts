@@ -31,10 +31,16 @@ export async function createNotification(
   await supabase.from("notification").insert({
     recipient_id: input.recipientId,
     notification_type: input.type,
+    type: input.type,
     title: input.title,
     content: input.content,
+    level: input.level ?? "INFO",
     business_type: input.businessType,
     business_id: input.businessId,
+    action_url: input.actionUrl ?? null,
+    dedupe_key: input.dedupeKey ?? null,
+    source_event: input.sourceEvent ?? "SERVER_ACTION",
+    source_module: input.sourceModule ?? "APP",
   });
 }
 
@@ -47,10 +53,16 @@ export async function createNotifications(
     inputs.map((i) => ({
       recipient_id: i.recipientId,
       notification_type: i.type,
+      type: i.type,
       title: i.title,
       content: i.content,
+      level: i.level ?? "INFO",
       business_type: i.businessType,
       business_id: i.businessId,
+      action_url: i.actionUrl ?? null,
+      dedupe_key: i.dedupeKey ?? null,
+      source_event: i.sourceEvent ?? "SERVER_ACTION",
+      source_module: i.sourceModule ?? "APP",
     }))
   );
 }

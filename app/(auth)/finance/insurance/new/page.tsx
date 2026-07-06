@@ -4,7 +4,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { createInsurancePolicyForm } from "@/lib/actions/cr08";
+import { createInsurancePolicyForm } from "@/lib/actions/operations";
 
 export default async function NewInsurancePolicyPage({ searchParams }: { searchParams: Promise<{ equipmentId?: string }> }) {
   const sp = await searchParams;

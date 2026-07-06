@@ -43,9 +43,13 @@ next-env.d.ts
 # claude code
 .claude
 skills-lock.json
+.agents
 
 #reasonix
 .reasonix
 
 #docs
 docs
+
+#idea
+.idea

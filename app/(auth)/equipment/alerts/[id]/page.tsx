@@ -6,9 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { InfoGrid } from "@/components/data/info-grid";
-import { handleEquipmentAlertForm } from "@/lib/actions/cr08";
+import { handleEquipmentAlertForm } from "@/lib/actions/operations";
 import { formatDateTime } from "@/lib/utils";
-import { ALERT_LEVEL, ALERT_STATUS, ALERT_TYPE, statusVariant } from "@/lib/cr08-labels";
+import { ALERT_LEVEL, ALERT_STATUS, ALERT_TYPE, statusVariant } from "@/lib/operation-labels";
 
 export default async function EquipmentAlertDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

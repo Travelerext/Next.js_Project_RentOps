@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
-import { submitCustomerRepairForm } from "@/lib/actions/cr08";
+import { submitCustomerRepairForm } from "@/lib/actions/operations";
 
 export default async function NewCustomerRepairPage({ searchParams }: { searchParams: Promise<{ equipmentId?: string }> }) {
   const sp = await searchParams;

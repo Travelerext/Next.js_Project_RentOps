@@ -1,9 +1,9 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { DataPage } from "@/components/data/data-page";
 import { DataTable, type Column } from "@/components/data/data-table";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/utils";
-import { ALERT_LEVEL, ALERT_STATUS, ALERT_TYPE, statusVariant } from "@/lib/cr08-labels";
+import { ALERT_LEVEL, ALERT_STATUS, ALERT_TYPE, statusVariant } from "@/lib/operation-labels";
 
 export default async function EquipmentAlertsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   const supabase = await createClient();

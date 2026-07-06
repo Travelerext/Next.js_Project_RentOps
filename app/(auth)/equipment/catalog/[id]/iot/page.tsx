@@ -6,9 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { InfoGrid } from "@/components/data/info-grid";
-import { bindIotTerminalForm, unbindIotTerminalForm } from "@/lib/actions/cr08";
+import { bindIotTerminalForm, unbindIotTerminalForm } from "@/lib/actions/operations";
 import { formatDateTime } from "@/lib/utils";
-import { IOT_STATUS, statusVariant } from "@/lib/cr08-labels";
+import { IOT_STATUS, statusVariant } from "@/lib/operation-labels";
 
 export default async function EquipmentIotPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

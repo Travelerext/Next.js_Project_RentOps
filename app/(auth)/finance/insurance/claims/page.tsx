@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { DataPage } from "@/components/data/data-page";
@@ -6,7 +6,7 @@ import { DataTable, type Column } from "@/components/data/data-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CLAIM_STATUS, statusVariant } from "@/lib/cr08-labels";
+import { CLAIM_STATUS, statusVariant } from "@/lib/operation-labels";
 
 export default async function InsuranceClaimsPage() {
   const supabase = await createClient();

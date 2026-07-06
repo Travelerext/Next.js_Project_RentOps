@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { BarChart3 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { DataPage } from "@/components/data/data-page";
@@ -7,7 +7,7 @@ import { StatsGrid } from "@/components/data/stats-grid";
 import { StatCard } from "@/components/data/stat-card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { pct } from "@/lib/cr08-labels";
+import { pct } from "@/lib/operation-labels";
 
 export default async function EquipmentUtilizationReportPage() {
   const supabase = await createClient();

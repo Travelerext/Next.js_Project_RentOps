@@ -37,7 +37,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ── 1. Rsync source code to server ──────────────────────────
+      # ── 1. Apply database migrations ────────────────────────────
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Push database migrations
+        run: supabase db push --db-url "$DATABASE_URL" --yes
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      # ── 2. Rsync source code to server ──────────────────────────
       - name: Rsync files to server
         uses: easingthemes/ssh-deploy@v5.1.0
         with:
@@ -48,13 +58,14 @@ jobs:
           TARGET: ${{ vars.DEPLOY_PATH || '/opt/rentops' }}
           EXCLUDE: .git, .github, .claude, .idea, node_modules, .env, .env.*, logs, *.md
 
-      # ── 2. Install, build, migrate & restart ────────────────────
+      # ── 3. Install, build & restart ─────────────────────────────
       - name: Build & restart on server
         uses: appleboy/ssh-action@v1.2.0
         env:
           NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           DEEPSEEK_API_URL: ${{ secrets.DEEPSEEK_API_URL || vars.DEEPSEEK_API_URL || 'https://api.deepseek.com/chat/completions' }}
           DEEPSEEK_MODEL: ${{ secrets.DEEPSEEK_MODEL || vars.DEEPSEEK_MODEL || 'deepseek-v4-flash' }}
@@ -64,7 +75,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SSH_PORT }}
-          envs: NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,SUPABASE_SERVICE_ROLE_KEY,DEEPSEEK_API_KEY,DEEPSEEK_API_URL,DEEPSEEK_MODEL,DEEPSEEK_TIMEOUT_MS
+          envs: NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,SUPABASE_SERVICE_ROLE_KEY,DATABASE_URL,DEEPSEEK_API_KEY,DEEPSEEK_API_URL,DEEPSEEK_MODEL,DEEPSEEK_TIMEOUT_MS
           script: |
             set -e
 
@@ -76,6 +87,7 @@ jobs:
             NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
             NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
             SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+            DATABASE_URL=${DATABASE_URL}
             DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
             DEEPSEEK_API_URL=${DEEPSEEK_API_URL}
             DEEPSEEK_MODEL=${DEEPSEEK_MODEL}

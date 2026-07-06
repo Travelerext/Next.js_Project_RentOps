@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { InfoGrid } from "@/components/data/info-grid";
 import { DataTable, type Column } from "@/components/data/data-table";
-import { upsertTelemetryForm } from "@/lib/actions/cr08";
+import { upsertTelemetryForm } from "@/lib/actions/operations";
 import { formatDateTime } from "@/lib/utils";
 
 export default async function EquipmentTrackingPage({ params }: { params: Promise<{ id: string }> }) {

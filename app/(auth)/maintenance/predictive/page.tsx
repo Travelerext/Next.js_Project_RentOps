@@ -7,9 +7,9 @@ import { StatsGrid } from "@/components/data/stats-grid";
 import { StatCard } from "@/components/data/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { confirmPredictiveSuggestionForm } from "@/lib/actions/cr08";
+import { confirmPredictiveSuggestionForm } from "@/lib/actions/operations";
 import { formatDateTime } from "@/lib/utils";
-import { statusVariant } from "@/lib/cr08-labels";
+import { statusVariant } from "@/lib/operation-labels";
 
 const STATUS: Record<string, string> = {
   OPEN: "待确认",

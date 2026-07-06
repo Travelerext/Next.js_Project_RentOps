@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Activity, Cpu, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { DataPage } from "@/components/data/data-page";
@@ -8,7 +8,7 @@ import { StatCard } from "@/components/data/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/utils";
-import { IOT_STATUS, statusVariant } from "@/lib/cr08-labels";
+import { IOT_STATUS, statusVariant } from "@/lib/operation-labels";
 
 export default async function IotDevicesPage() {
   const supabase = await createClient();

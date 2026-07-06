@@ -6,6 +6,7 @@ import { z } from "zod";
 import { generateNo } from "@/lib/utils";
 import type { ActionResult } from "@/lib/action-result";
 import { createNotification } from "@/lib/actions/notification";
+import { syncCustomerRepairFromWorkOrder } from "@/lib/actions/operations";
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -163,6 +164,8 @@ export async function assignWorkOrder(
     .eq("id", workOrderId);
   if (error) return { success: false, error: error.message };
 
+  await syncCustomerRepairFromWorkOrder(workOrderId, "ASSIGNED");
+
   // Notify assignee
   await createNotification({
     recipientId: assigneeId,
@@ -200,6 +203,8 @@ export async function startRepair(workOrderId: string): Promise<ActionResult<nul
     })
     .eq("id", workOrderId);
   if (error) return { success: false, error: error.message };
+
+  await syncCustomerRepairFromWorkOrder(workOrderId, "IN_PROGRESS");
 
   await supabase.from("audit_log").insert({
     actor_id: auth.profileId,
@@ -261,6 +266,8 @@ export async function completeWorkOrder(
     .eq("id", workOrderId);
   if (error) return { success: false, error: error.message };
 
+  await syncCustomerRepairFromWorkOrder(workOrderId, "COMPLETED");
+
   await supabase.from("audit_log").insert({
     actor_id: auth.profileId, action: "MAINTENANCE_COMPLETE",
     resource_type: "MAINTENANCE", resource_id: workOrderId,
@@ -297,6 +304,8 @@ export async function verifyWorkOrder(workOrderId: string): Promise<ActionResult
     })
     .eq("id", workOrderId);
   if (error) return { success: false, error: error.message };
+
+  await syncCustomerRepairFromWorkOrder(workOrderId, "VERIFIED");
 
   // Return equipment to in-stock
   await supabase
@@ -346,6 +355,8 @@ export async function closeWorkOrder(workOrderId: string): Promise<ActionResult<
     })
     .eq("id", workOrderId);
   if (error) return { success: false, error: error.message };
+
+  await syncCustomerRepairFromWorkOrder(workOrderId, "CLOSED");
 
   await supabase.from("audit_log").insert({
     actor_id: auth.profileId, action: "MAINTENANCE_CLOSE",

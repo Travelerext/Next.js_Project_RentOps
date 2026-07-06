@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { InfoGrid } from "@/components/data/info-grid";
 import { DataTable, type Column } from "@/components/data/data-table";
-import { convertInquiryToOrderForm, updateInquiryStatusForm } from "@/lib/actions/cr08";
+import { convertInquiryToOrderForm, updateInquiryStatusForm } from "@/lib/actions/operations";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import { INQUIRY_STATUS, statusVariant } from "@/lib/cr08-labels";
+import { INQUIRY_STATUS, statusVariant } from "@/lib/operation-labels";
 
 export default async function SalesInquiryDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

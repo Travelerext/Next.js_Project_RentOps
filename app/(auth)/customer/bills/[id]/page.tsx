@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
@@ -9,10 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { InfoGrid } from "@/components/data/info-grid";
 import { DataTable, type Column } from "@/components/data/data-table";
-import { submitPaymentVoucherForm } from "@/lib/actions/cr08";
+import { submitPaymentVoucherForm } from "@/lib/actions/operations";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { RECEIVABLE_STATUS } from "@/lib/constants";
-import { VOUCHER_STATUS, statusVariant } from "@/lib/cr08-labels";
+import { VOUCHER_STATUS, statusVariant } from "@/lib/operation-labels";
 
 export default async function CustomerBillDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

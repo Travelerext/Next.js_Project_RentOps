@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable, type Column } from "@/components/data/data-table";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CLAIM_STATUS, statusVariant } from "@/lib/cr08-labels";
+import { CLAIM_STATUS, statusVariant } from "@/lib/operation-labels";
 
 export default async function EquipmentInsuranceClaimsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

@@ -1,39 +1,37 @@
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { InfoGrid } from "@/components/data/info-grid";
-import { formatDateTime } from "@/lib/utils";
-import { CUSTOMER_REPAIR_STATUS, statusVariant } from "@/lib/cr08-labels";
+import { Select } from "@/components/ui/select";
+import { submitCustomerRepairForm } from "@/lib/actions/operations";
 
-export default async function CustomerRepairDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function NewCustomerRepairPage({ searchParams }: { searchParams: Promise<{ equipmentId?: string }> }) {
+  const sp = await searchParams;
   const supabase = await createClient();
-  const { data: repair } = await supabase
-    .from("customer_repair_request")
-    .select("*, equipment:equipment_id(equipment_no, name), work_order:work_order_id(work_order_no, status)")
-    .eq("id", id)
-    .single();
-  if (!repair) return <p className="py-12 text-center text-app-muted">报修单不存在</p>;
-  const equipment = repair.equipment as { equipment_no: string; name: string } | null;
-  const workOrder = repair.work_order as { work_order_no?: string; status?: string } | null;
+  const { data: equipment } = await supabase
+    .from("equipment")
+    .select("id, equipment_no, name")
+    .order("equipment_no");
   return (
     <div className="space-y-6">
-      <PageHeader title={repair.request_no as string} subtitle={equipment ? `${equipment.equipment_no} / ${equipment.name}` : undefined} backUrl="/customer/repairs" status={<Badge variant={statusVariant(repair.status as string)}>{CUSTOMER_REPAIR_STATUS[repair.status as string] ?? repair.status as string}</Badge>} actions={<Link href="/customer/repairs/new"><Button variant="outline">继续报修</Button></Link>} />
+      <PageHeader title="提交报修" backUrl="/customer/repairs" />
       <Card>
-        <CardHeader><CardTitle>报修详情</CardTitle></CardHeader>
-        <InfoGrid
-          items={[
-            { label: "故障描述", value: repair.fault_description },
-            { label: "提交时间", value: formatDateTime(repair.created_at as string) },
-            { label: "更新时间", value: formatDateTime(repair.updated_at as string) },
-            { label: "维修工单", value: workOrder?.work_order_no ?? "-" },
-            { label: "工单状态", value: workOrder?.status ?? "-" },
-          ]}
-        />
+        <CardHeader><CardTitle>报修信息</CardTitle></CardHeader>
+        <form action={submitCustomerRepairForm} className="space-y-4">
+          <input type="hidden" name="redirectTo" value="/customer/repairs" />
+          <Select name="equipmentId" label="报修设备" required defaultValue={sp.equipmentId ?? ""} options={(equipment ?? []).map((item) => ({ value: item.id as string, label: `${item.equipment_no} / ${item.name}` }))} />
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-app-muted-strong">
+            故障描述
+            <textarea name="faultDescription" rows={5} required className="premium-control rounded-lg border border-app-border px-3 py-2 text-sm text-app-fg focus-ring" />
+          </label>
+          <label className="flex flex-col gap-1.5 text-sm font-medium text-app-muted-strong">
+            图片 URL（每行一个）
+            <textarea name="photoUrls" rows={3} className="premium-control rounded-lg border border-app-border px-3 py-2 text-sm text-app-fg focus-ring" />
+          </label>
+          <Button variant="primary" type="submit">提交报修</Button>
+        </form>
       </Card>
     </div>
   );
 }
+

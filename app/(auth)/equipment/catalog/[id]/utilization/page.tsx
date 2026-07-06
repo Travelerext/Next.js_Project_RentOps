@@ -4,9 +4,9 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DataTable, type Column } from "@/components/data/data-table";
-import { generateUtilizationSnapshotForm } from "@/lib/actions/cr08";
+import { generateUtilizationSnapshotForm } from "@/lib/actions/operations";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { pct } from "@/lib/cr08-labels";
+import { pct } from "@/lib/operation-labels";
 
 export default async function EquipmentUtilizationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

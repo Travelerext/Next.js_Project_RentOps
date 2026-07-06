@@ -1,4 +1,4 @@
-import { HeartPulse } from "lucide-react";
+﻿import { HeartPulse } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { DataPage } from "@/components/data/data-page";
 import { DataTable, type Column } from "@/components/data/data-table";
@@ -6,7 +6,7 @@ import { StatsGrid } from "@/components/data/stats-grid";
 import { StatCard } from "@/components/data/stat-card";
 import { Badge } from "@/components/ui/badge";
 import { formatDateTime } from "@/lib/utils";
-import { HEALTH_LEVEL, statusVariant } from "@/lib/cr08-labels";
+import { HEALTH_LEVEL, statusVariant } from "@/lib/operation-labels";
 
 export default async function EquipmentHealthReportPage() {
   const supabase = await createClient();

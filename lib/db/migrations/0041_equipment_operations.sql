@@ -1,4 +1,4 @@
--- CR08 equipment change objects: IoT, customer portal, insurance and utilization.
+﻿-- Equipment operations equipment change objects: IoT, customer portal, insurance and utilization.
 
 CREATE TABLE IF NOT EXISTS public.iot_terminal (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -290,44 +290,44 @@ ALTER TABLE public.equipment_insurance_cost_allocation ENABLE ROW LEVEL SECURITY
 ALTER TABLE public.equipment_utilization_snapshot ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.utilization_diagnosis_rule ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "cr08 internal iot terminal" ON public.iot_terminal
+CREATE POLICY "Equipment operations internal iot terminal" ON public.iot_terminal
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR','MAINTENANCE_SUPERVISOR')))
   WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR','MAINTENANCE_SUPERVISOR')));
 
-CREATE POLICY "cr08 internal equipment iot" ON public.equipment_iot_binding
+CREATE POLICY "Equipment operations internal equipment iot" ON public.equipment_iot_binding
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR')))
   WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR')));
 
-CREATE POLICY "cr08 internal telemetry" ON public.equipment_telemetry_latest
+CREATE POLICY "Equipment operations internal telemetry" ON public.equipment_telemetry_latest
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR','MAINTENANCE','MAINTENANCE_SUPERVISOR','SALES','SALES_MANAGER')))
   WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR')));
 
-CREATE POLICY "cr08 internal geofence alert" ON public.equipment_geofence
+CREATE POLICY "Equipment operations internal geofence alert" ON public.equipment_geofence
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR','MAINTENANCE_SUPERVISOR')))
   WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR','MAINTENANCE_SUPERVISOR')));
 
-CREATE POLICY "cr08 internal equipment alerts" ON public.equipment_alert
+CREATE POLICY "Equipment operations internal equipment alerts" ON public.equipment_alert
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR','MAINTENANCE','MAINTENANCE_SUPERVISOR','SALES_MANAGER')))
   WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR','MAINTENANCE_SUPERVISOR')));
 
-CREATE POLICY "cr08 predictive internal" ON public.predictive_maintenance_suggestion
+CREATE POLICY "Equipment operations predictive internal" ON public.predictive_maintenance_suggestion
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','MAINTENANCE','MAINTENANCE_SUPERVISOR','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR')))
   WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','MAINTENANCE_SUPERVISOR','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR')));
 
-CREATE POLICY "cr08 health internal read" ON public.equipment_health_score
+CREATE POLICY "Equipment operations health internal read" ON public.equipment_health_score
   FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role <> 'CUSTOMER'));
-CREATE POLICY "cr08 health internal write" ON public.equipment_health_score
+CREATE POLICY "Equipment operations health internal write" ON public.equipment_health_score
   FOR INSERT TO authenticated
   WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR','MAINTENANCE_SUPERVISOR')));
 
-CREATE POLICY "cr08 inquiry staff or owner" ON public.rental_inquiry
+CREATE POLICY "Equipment operations inquiry staff or owner" ON public.rental_inquiry
   FOR ALL TO authenticated
   USING (
     EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','SALES','SALES_MANAGER'))
@@ -338,12 +338,12 @@ CREATE POLICY "cr08 inquiry staff or owner" ON public.rental_inquiry
     OR EXISTS (SELECT 1 FROM public.profiles p JOIN public.customer c ON c.owner_user_id = p.id WHERE p.supabase_user_id = (SELECT auth.uid()) AND c.id = rental_inquiry.customer_id)
   );
 
-CREATE POLICY "cr08 inquiry item via parent" ON public.rental_inquiry_item
+CREATE POLICY "Equipment operations inquiry item via parent" ON public.rental_inquiry_item
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.rental_inquiry ri WHERE ri.id = rental_inquiry_item.inquiry_id))
   WITH CHECK (EXISTS (SELECT 1 FROM public.rental_inquiry ri WHERE ri.id = rental_inquiry_item.inquiry_id));
 
-CREATE POLICY "cr08 sign task staff or contract customer" ON public.contract_sign_task
+CREATE POLICY "Equipment operations sign task staff or contract customer" ON public.contract_sign_task
   FOR ALL TO authenticated
   USING (
     EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','SALES','SALES_MANAGER'))
@@ -356,7 +356,7 @@ CREATE POLICY "cr08 sign task staff or contract customer" ON public.contract_sig
   )
   WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','SALES','SALES_MANAGER')));
 
-CREATE POLICY "cr08 voucher staff or owner" ON public.payment_voucher
+CREATE POLICY "Equipment operations voucher staff or owner" ON public.payment_voucher
   FOR ALL TO authenticated
   USING (
     EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','FINANCE','FINANCE_MANAGER'))
@@ -367,7 +367,7 @@ CREATE POLICY "cr08 voucher staff or owner" ON public.payment_voucher
     OR EXISTS (SELECT 1 FROM public.profiles p JOIN public.customer c ON c.owner_user_id = p.id WHERE p.supabase_user_id = (SELECT auth.uid()) AND c.id = payment_voucher.customer_id)
   );
 
-CREATE POLICY "cr08 repair staff or owner" ON public.customer_repair_request
+CREATE POLICY "Equipment operations repair staff or owner" ON public.customer_repair_request
   FOR ALL TO authenticated
   USING (
     EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','MAINTENANCE','MAINTENANCE_SUPERVISOR'))
@@ -378,27 +378,27 @@ CREATE POLICY "cr08 repair staff or owner" ON public.customer_repair_request
     OR EXISTS (SELECT 1 FROM public.profiles p JOIN public.customer c ON c.owner_user_id = p.id WHERE p.supabase_user_id = (SELECT auth.uid()) AND c.id = customer_repair_request.customer_id)
   );
 
-CREATE POLICY "cr08 insurance staff policy" ON public.equipment_insurance_policy
+CREATE POLICY "Equipment operations insurance staff policy" ON public.equipment_insurance_policy
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','FINANCE','FINANCE_MANAGER','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR')))
   WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','FINANCE','FINANCE_MANAGER')));
 
-CREATE POLICY "cr08 insurance staff claim" ON public.equipment_insurance_claim
+CREATE POLICY "Equipment operations insurance staff claim" ON public.equipment_insurance_claim
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','FINANCE','FINANCE_MANAGER','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR')))
   WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','FINANCE','FINANCE_MANAGER','EQUIPMENT_MANAGER')));
 
-CREATE POLICY "cr08 insurance allocation staff" ON public.equipment_insurance_cost_allocation
+CREATE POLICY "Equipment operations insurance allocation staff" ON public.equipment_insurance_cost_allocation
   FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','FINANCE','FINANCE_MANAGER')));
 
-CREATE POLICY "cr08 utilization staff" ON public.equipment_utilization_snapshot
+CREATE POLICY "Equipment operations utilization staff" ON public.equipment_utilization_snapshot
   FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role <> 'CUSTOMER'));
-CREATE POLICY "cr08 utilization staff insert" ON public.equipment_utilization_snapshot
+CREATE POLICY "Equipment operations utilization staff insert" ON public.equipment_utilization_snapshot
   FOR INSERT TO authenticated
   WITH CHECK (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role IN ('SYSTEM_ADMIN','EQUIPMENT_MANAGER','EQUIPMENT_SUPERVISOR','FINANCE_MANAGER')));
 
-CREATE POLICY "cr08 diagnosis staff" ON public.utilization_diagnosis_rule
+CREATE POLICY "Equipment operations diagnosis staff" ON public.utilization_diagnosis_rule
   FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM public.profiles p WHERE p.supabase_user_id = (SELECT auth.uid()) AND p.primary_role <> 'CUSTOMER'));

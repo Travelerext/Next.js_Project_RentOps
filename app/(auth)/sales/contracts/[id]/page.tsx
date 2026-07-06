@@ -11,7 +11,7 @@ import { CONTRACT_STATUS } from "@/lib/constants";
 import Link from "next/link";
 import { DirectionalTransition } from "@/components/layout/directional-transition";
 import { ContractActions } from "./actions";
-import { createContractSignTaskForm } from "@/lib/actions/cr08";
+import { createContractSignTaskForm } from "@/lib/actions/operations";
 
 const itemColumns: Column<Record<string, unknown>>[] = [
   { id: "no", header: "设备编号", cell: (i) => <span className="font-mono text-sm">{i.equipment_no_snapshot as string}</span> },
