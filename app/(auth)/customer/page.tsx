@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import {
   FileText, DollarSign, Package, Receipt, CircleDollarSign,
-  HelpCircle, FileSearch,
+  UserRound, FileSearch, Wrench,
 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -144,30 +144,30 @@ export default async function CustomerDashboardPage() {
             <p className="text-sm text-zinc-500 px-6 pb-4">查看当前进行中的租赁订单</p>
           </Card>
         </Link>
-        <Link href="/customer/payments">
+        <Link href="/customer/profile">
           <Card className="transition-shadow hover:shadow-md">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                  <Receipt className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  <UserRound className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                 </div>
-                <CardTitle>付款记录</CardTitle>
+                <CardTitle>客户资料</CardTitle>
               </div>
             </CardHeader>
-            <p className="text-sm text-zinc-500 px-6 pb-4">查看历史付款和押金记录</p>
+            <p className="text-sm text-zinc-500 px-6 pb-4">绑定客户档案并维护开票资料</p>
           </Card>
         </Link>
-        <Link href="/customer/support">
+        <Link href="/customer/repairs">
           <Card className="transition-shadow hover:shadow-md">
             <CardHeader>
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 dark:bg-purple-900/30">
-                  <HelpCircle className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                  <Wrench className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                 </div>
-                <CardTitle>在线支持</CardTitle>
+                <CardTitle>我的报修</CardTitle>
               </div>
             </CardHeader>
-            <p className="text-sm text-zinc-500 px-6 pb-4">联系客服或提交维修申请</p>
+            <p className="text-sm text-zinc-500 px-6 pb-4">提交设备报修并跟进处理进度</p>
           </Card>
         </Link>
         <Link href="/customer/invoices">

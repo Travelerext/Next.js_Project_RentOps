@@ -2,7 +2,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { ORDER_STATUS } from "@/lib/constants";
+import { GenerateInvoiceButton } from "@/app/(auth)/sales/orders/[id]/generate-invoice-button";
 import {
   INVOICE_STATUS_LABELS,
   INVOICE_STATUS_VARIANTS,
@@ -31,6 +34,20 @@ export default async function CustomerInvoicesPage() {
         .eq("customer_id", customer.id)
         .order("issued_at", { ascending: false })
     : { data: [] };
+  const { data: orders } = customer
+    ? await supabase
+        .from("rental_order")
+        .select("id, order_no, order_status, total_rent_amount, created_at, customer:customer_id(name, tax_no, invoice_title, invoice_address_phone, invoice_bank_account)")
+        .eq("customer_id", customer.id)
+        .not("order_status", "in", "(DRAFT,CANCELLED)")
+        .order("created_at", { ascending: false })
+        .limit(10)
+    : { data: [] };
+  const orderIds = (orders ?? []).map((order) => order.id as string);
+  const { data: orderInvoices } = orderIds.length > 0
+    ? await supabase.from("invoice_record").select("id, order_id").in("order_id", orderIds)
+    : { data: [] };
+  const invoiceByOrder = new Map((orderInvoices ?? []).map((invoice) => [invoice.order_id as string, invoice.id as string]));
 
   return (
     <div className="space-y-6">
@@ -38,6 +55,46 @@ export default async function CustomerInvoicesPage() {
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">发票管理</h1>
         <p className="mt-1 text-sm text-zinc-500">查看已生成的订单发票</p>
       </div>
+
+      <Card>
+        <CardHeader><CardTitle>可开票订单</CardTitle></CardHeader>
+        <div className="space-y-3 p-4 pt-0">
+          {(orders ?? []).map((order) => {
+            const orderCustomer = order.customer as {
+              name?: string | null;
+              tax_no?: string | null;
+              invoice_title?: string | null;
+              invoice_address_phone?: string | null;
+              invoice_bank_account?: string | null;
+            } | null;
+            return (
+              <div key={order.id} className="flex flex-col gap-3 rounded-lg border border-app-border p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="font-mono text-sm font-medium text-app-fg">{order.order_no}</p>
+                  <p className="mt-1 text-sm text-app-muted">
+                    {ORDER_STATUS[order.order_status as string] ?? order.order_status} · {formatDate(order.created_at as string)}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold tabular-nums">{formatCurrency(order.total_rent_amount)}</p>
+                </div>
+                <GenerateInvoiceButton
+                  orderId={order.id as string}
+                  existingInvoiceId={invoiceByOrder.get(order.id as string)}
+                  invoiceHrefBase="/customer/invoices"
+                  defaults={{
+                    title: orderCustomer?.invoice_title ?? orderCustomer?.name,
+                    taxNo: orderCustomer?.tax_no,
+                    addressPhone: orderCustomer?.invoice_address_phone,
+                    bankAccount: orderCustomer?.invoice_bank_account,
+                  }}
+                />
+              </div>
+            );
+          })}
+          {(!orders || orders.length === 0) ? (
+            <p className="py-6 text-center text-sm text-app-muted">暂无可开票订单</p>
+          ) : null}
+        </div>
+      </Card>
 
       <div className="space-y-3">
         {(invoices ?? []).map((invoice) => {

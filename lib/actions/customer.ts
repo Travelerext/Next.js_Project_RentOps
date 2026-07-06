@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { generateNo } from "@/lib/utils";
@@ -26,6 +27,78 @@ const customerSchema = z.object({
   remark: z.string().optional(),
 });
 
+const selfCustomerSchema = z.object({
+  name: z.string().trim().min(1, "客户名称不能为空"),
+  shortName: z.string().trim().optional(),
+  contactName: z.string().trim().optional(),
+  contactPhone: z.string().trim().min(1, "联系电话不能为空"),
+  taxNo: z.string().trim().optional(),
+  invoiceTitle: z.string().trim().optional(),
+  invoiceAddressPhone: z.string().trim().optional(),
+  invoiceBankAccount: z.string().trim().optional(),
+  remark: z.string().trim().optional(),
+});
+
+const bindCustomerSchema = z.object({
+  customerNo: z.string().trim().min(1, "客户编号不能为空"),
+  contactPhone: z.string().trim().optional(),
+  taxNo: z.string().trim().optional(),
+}).refine((value) => Boolean(value.contactPhone || value.taxNo), {
+  message: "请填写联系电话或纳税人识别号用于校验",
+  path: ["contactPhone"],
+});
+
+function normalizeDigits(value: string | null | undefined) {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+async function requireCustomerAuth() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "未登录" as const };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, primary_role")
+    .eq("supabase_user_id", user.id)
+    .maybeSingle();
+
+  if (!profile) return { error: "用户档案不存在" as const };
+  if (profile.primary_role !== "CUSTOMER") return { error: "仅客户账号可维护客户资料" as const };
+
+  return { profileId: profile.id as string };
+}
+
+function parseSelfCustomerForm(formData: FormData) {
+  return {
+    name: (formData.get("name") as string) ?? "",
+    shortName: (formData.get("shortName") as string) || undefined,
+    contactName: (formData.get("contactName") as string) || undefined,
+    contactPhone: (formData.get("contactPhone") as string) ?? "",
+    taxNo: (formData.get("taxNo") as string) || undefined,
+    invoiceTitle: (formData.get("invoiceTitle") as string) || undefined,
+    invoiceAddressPhone: (formData.get("invoiceAddressPhone") as string) || undefined,
+    invoiceBankAccount: (formData.get("invoiceBankAccount") as string) || undefined,
+    remark: (formData.get("remark") as string) || undefined,
+  };
+}
+
+function buildSelfCustomerPatch(parsed: z.infer<typeof selfCustomerSchema>, profileId: string) {
+  return {
+    name: parsed.name,
+    short_name: parsed.shortName || null,
+    contact_name: parsed.contactName || null,
+    contact_phone: parsed.contactPhone,
+    tax_no: parsed.taxNo || null,
+    invoice_title: parsed.invoiceTitle || parsed.name,
+    invoice_address_phone: parsed.invoiceAddressPhone || null,
+    invoice_bank_account: parsed.invoiceBankAccount || null,
+    remark: parsed.remark || null,
+    updated_by: profileId,
+    updated_at: new Date().toISOString(),
+  };
+}
+
 function parseForm(formData: FormData) {
   return {
     name: (formData.get("name") as string)?.trim() || "",
@@ -46,6 +119,116 @@ function parseForm(formData: FormData) {
     status: (formData.get("status") as string) || "ACTIVE",
     remark: (formData.get("remark") as string)?.trim() || undefined,
   };
+}
+
+export async function upsertMyCustomerProfile(formData: FormData): Promise<ActionResult<null>> {
+  const auth = await requireCustomerAuth();
+  if ("error" in auth) return { success: false, error: auth.error ?? "未登录" };
+
+  const parsed = selfCustomerSchema.safeParse(parseSelfCustomerForm(formData));
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: "参数校验失败",
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+    };
+  }
+
+  const admin = createAdminClient();
+  const { data: existing } = await admin
+    .from("customer")
+    .select("id")
+    .eq("owner_user_id", auth.profileId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (existing?.id) {
+    const { error } = await admin
+      .from("customer")
+      .update(buildSelfCustomerPatch(parsed.data, auth.profileId))
+      .eq("id", existing.id);
+    if (error) return { success: false, error: error.message };
+  } else {
+    const { error } = await admin.from("customer").insert({
+      customer_no: generateNo("CUS"),
+      owner_user_id: auth.profileId,
+      customer_type: "ENTERPRISE",
+      credit_level: "B",
+      risk_level: "LOW",
+      credit_limit: 0,
+      is_monthly_settlement: false,
+      monthly_settlement_cycle: 30,
+      is_blacklisted: false,
+      status: "ACTIVE",
+      created_by: auth.profileId,
+      ...buildSelfCustomerPatch(parsed.data, auth.profileId),
+    });
+    if (error) return { success: false, error: error.message };
+  }
+
+  revalidatePath("/customer");
+  revalidatePath("/customer/profile");
+  return { success: true, data: null };
+}
+
+export async function bindMyExistingCustomer(formData: FormData): Promise<ActionResult<null>> {
+  const auth = await requireCustomerAuth();
+  if ("error" in auth) return { success: false, error: auth.error ?? "未登录" };
+
+  const parsed = bindCustomerSchema.safeParse({
+    customerNo: formData.get("customerNo"),
+    contactPhone: (formData.get("contactPhone") as string) || undefined,
+    taxNo: (formData.get("taxNo") as string) || undefined,
+  });
+  if (!parsed.success) {
+    return {
+      success: false,
+      error: "参数校验失败",
+      fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+    };
+  }
+
+  const admin = createAdminClient();
+  const { data: current } = await admin
+    .from("customer")
+    .select("id")
+    .eq("owner_user_id", auth.profileId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (current?.id) return { success: false, error: "当前账号已经绑定客户资料" };
+
+  const { data: customer } = await admin
+    .from("customer")
+    .select("id, owner_user_id, contact_phone, tax_no")
+    .eq("customer_no", parsed.data.customerNo)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!customer) return { success: false, error: "未找到匹配的客户编号" };
+  if (customer.owner_user_id && customer.owner_user_id !== auth.profileId) {
+    return { success: false, error: "该客户资料已绑定其他账号" };
+  }
+
+  const phoneMatches = parsed.data.contactPhone
+    ? normalizeDigits(parsed.data.contactPhone) === normalizeDigits(customer.contact_phone as string | null)
+    : false;
+  const taxMatches = parsed.data.taxNo
+    ? parsed.data.taxNo.toUpperCase() === String(customer.tax_no ?? "").toUpperCase()
+    : false;
+
+  if (!phoneMatches && !taxMatches) {
+    return { success: false, error: "客户编号与联系电话/税号不匹配" };
+  }
+
+  const { error } = await admin
+    .from("customer")
+    .update({ owner_user_id: auth.profileId, updated_by: auth.profileId, updated_at: new Date().toISOString() })
+    .eq("id", customer.id);
+  if (error) return { success: false, error: error.message };
+
+  revalidatePath("/customer");
+  revalidatePath("/customer/profile");
+  return { success: true, data: null };
 }
 
 function buildInsert(parsed: z.infer<typeof customerSchema>, profileId: string) {

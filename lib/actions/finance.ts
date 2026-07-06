@@ -64,20 +64,8 @@ export async function generateOrderInvoice(
   if (!profile) return { success: false, error: "用户档案不存在" };
 
   const role = profile.primary_role ?? "";
-  if (!["SYSTEM_ADMIN", "FINANCE", "FINANCE_MANAGER", "SALES", "SALES_MANAGER"].includes(role)) {
+  if (!["SYSTEM_ADMIN", "FINANCE", "FINANCE_MANAGER", "SALES", "SALES_MANAGER", "CUSTOMER"].includes(role)) {
     return { success: false, error: "无权生成发票" };
-  }
-
-  const { data: existing } = await supabase
-    .from("invoice_record")
-    .select("id, invoice_no")
-    .eq("order_id", orderId)
-    .maybeSingle();
-  if (existing) {
-    return {
-      success: true,
-      data: { id: existing.id as string, invoiceNo: existing.invoice_no as string, existing: true },
-    };
   }
 
   const raw = {
@@ -117,8 +105,30 @@ export async function generateOrderInvoice(
   ]);
 
   if (!order) return { success: false, error: "订单不存在" };
+  if (role === "CUSTOMER") {
+    const { data: ownedCustomer } = await supabase
+      .from("customer")
+      .select("id")
+      .eq("owner_user_id", profile.id)
+      .eq("id", order.customer_id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!ownedCustomer) return { success: false, error: "无权为该订单生成发票" };
+  }
   if (["DRAFT", "CANCELLED"].includes(order.order_status as string)) {
     return { success: false, error: "草稿或已取消订单不能生成发票" };
+  }
+
+  const { data: existing } = await supabase
+    .from("invoice_record")
+    .select("id, invoice_no")
+    .eq("order_id", orderId)
+    .maybeSingle();
+  if (existing) {
+    return {
+      success: true,
+      data: { id: existing.id as string, invoiceNo: existing.invoice_no as string, existing: true },
+    };
   }
 
   const customer = order.customer as unknown as {
@@ -224,6 +234,8 @@ export async function generateOrderInvoice(
   revalidatePath(`/finance/invoices/${inserted.id}`);
   revalidatePath(`/sales/orders/${orderId}`);
   revalidatePath("/customer/invoices");
+  revalidatePath(`/customer/invoices/${inserted.id}`);
+  revalidatePath("/customer/orders");
 
   return {
     success: true,

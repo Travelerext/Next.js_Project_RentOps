@@ -533,14 +533,32 @@ export async function submitPaymentVoucher(formData: FormData): Promise<ActionRe
     ? await currentCustomerId(auth.profileId)
     : str(formData, "customerId");
   if (!customerId) return { success: false, error: "客户信息不存在" };
+  const receivableId = nullableStr(formData, "receivableId");
+  const amount = num(formData, "amount");
+
+  if (amount <= 0) return { success: false, error: "付款金额必须大于 0" };
+
+  if (receivableId) {
+    const { data: receivable } = await supabase
+      .from("receivable")
+      .select("customer_id, status, unpaid_amount")
+      .eq("id", receivableId)
+      .maybeSingle();
+
+    if (!receivable) return { success: false, error: "账单不存在" };
+    if (receivable.customer_id !== customerId) return { success: false, error: "无权提交该账单的付款凭证" };
+    const unpaidAmount = Number(receivable.unpaid_amount ?? 0);
+    if (receivable.status === "PAID" || unpaidAmount <= 0) return { success: false, error: "该账单已结清，无需上传凭证" };
+    if (amount > unpaidAmount) return { success: false, error: "付款金额不能超过未付金额" };
+  }
 
   const { data, error } = await supabase
     .from("payment_voucher")
     .insert({
       voucher_no: generateNo("PV"),
       customer_id: customerId,
-      receivable_id: nullableStr(formData, "receivableId"),
-      amount: num(formData, "amount"),
+      receivable_id: receivableId,
+      amount,
       payment_method: str(formData, "paymentMethod", "BANK_TRANSFER"),
       bank_flow_no: nullableStr(formData, "bankFlowNo"),
       file_url: nullableStr(formData, "fileUrl"),

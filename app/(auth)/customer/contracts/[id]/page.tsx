@@ -9,6 +9,7 @@ import { DataTable, type Column } from "@/components/data/data-table";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { CONTRACT_STATUS } from "@/lib/constants";
 import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
 import { DirectionalTransition } from "@/components/layout/directional-transition";
 import { markSignTaskSignedForm } from "@/lib/actions/cr08";
 
@@ -24,24 +25,27 @@ export default async function CustomerContractDetailPage({ params }: { params: P
   const { id } = await params;
   const supabase = await createClient();
 
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("supabase_user_id", user.id)
+    .maybeSingle();
+
+  const { data: currentCustomer } = profile
+    ? await supabase.from("customer").select("id").eq("owner_user_id", profile.id).is("deleted_at", null).maybeSingle()
+    : { data: null };
+  if (!currentCustomer) notFound();
+
   // Fetch the contract first — bail early if not found
-  const { data: contract, error } = await supabase
+  const { data: contract } = await supabase
     .from("rental_contract")
     .select("*, customer:customer_id(name, contact_name)")
     .eq("id", id)
+    .eq("customer_id", currentCustomer.id)
     .maybeSingle();
-
-  if (error) {
-    console.error("Contract fetch error:", error);
-    return (
-      <DirectionalTransition>
-        <div className="text-center py-12">
-          <p className="text-zinc-500">合同不存在</p>
-          <Link href="/customer/contracts" className="text-blue-600 hover:underline">返回列表</Link>
-        </div>
-      </DirectionalTransition>
-    );
-  }
 
   if (!contract || contract.deleted_at) {
     return (

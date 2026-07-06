@@ -19,6 +19,7 @@ const INVOICE_TYPES = [
 interface Props {
   orderId: string;
   existingInvoiceId?: string;
+  invoiceHrefBase?: string;
   defaults: {
     title?: string | null;
     taxNo?: string | null;
@@ -27,7 +28,7 @@ interface Props {
   };
 }
 
-export function GenerateInvoiceButton({ orderId, existingInvoiceId, defaults }: Props) {
+export function GenerateInvoiceButton({ orderId, existingInvoiceId, invoiceHrefBase = "/finance/invoices", defaults }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -43,18 +44,18 @@ export function GenerateInvoiceButton({ orderId, existingInvoiceId, defaults }: 
     const result = await generateOrderInvoice(orderId, new FormData(event.currentTarget));
     if (result.success) {
       setOpen(false);
-      router.push(`/finance/invoices/${result.data.id}`);
+      router.push(`${invoiceHrefBase}/${result.data.id}`);
       return;
     }
 
     setError(result.error ?? "发票生成失败");
     setFieldErrors(result.fieldErrors ?? null);
     setSubmitting(false);
-  }, [orderId, router]);
+  }, [invoiceHrefBase, orderId, router]);
 
   if (existingInvoiceId) {
     return (
-      <Link href={`/finance/invoices/${existingInvoiceId}`}>
+      <Link href={`${invoiceHrefBase}/${existingInvoiceId}`}>
         <Button variant="outline">
           <FileText className="h-4 w-4" />
           查看发票

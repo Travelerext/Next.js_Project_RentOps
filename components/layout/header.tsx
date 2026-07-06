@@ -38,9 +38,11 @@ function applyTheme(preference: ThemePreference) {
 
 export function Header({
   displayName,
+  primaryRole,
   onMenuClick,
 }: {
   displayName?: string;
+  primaryRole?: string;
   onMenuClick?: () => void;
 }) {
   const router = useRouter();
@@ -106,6 +108,7 @@ export function Header({
       : themePreference === "dark"
         ? "深色模式"
         : "浅色模式";
+  const profileHref = primaryRole === "CUSTOMER" ? "/customer/profile" : "/profile";
 
   return (
     <header
@@ -167,7 +170,15 @@ export function Header({
 
         {/* User / Profile */}
         <Link
-          href="/profile"
+          href={profileHref}
+          className="focus-ring inline-flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-app-muted-strong transition-[background-color,border-color,color,transform] hover:-translate-y-0.5 hover:border-app-border hover:bg-app-surface hover:text-app-fg lg:hidden"
+          aria-label="个人资料"
+          title="个人资料"
+        >
+          <User className="h-4 w-4" aria-hidden="true" />
+        </Link>
+        <Link
+          href={profileHref}
           className="focus-ring premium-control ml-1 hidden h-9 items-center gap-2 rounded-lg border border-app-border px-2.5 text-sm text-app-muted-strong transition-[background-color,border-color,color,box-shadow,transform] hover:-translate-y-0.5 hover:text-app-fg lg:flex"
         >
           <User className="h-4 w-4" aria-hidden="true" />

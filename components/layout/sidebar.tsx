@@ -12,6 +12,7 @@ import {
   Calendar, Shield, CreditCard, Receipt, Banknote, ArrowLeftRight,
   Boxes, Gauge, Calculator, TrendingUp, ListChecks,
   History, PlusCircle, BrainCircuit, MapPin, RadioTower, type LucideIcon,
+  UserRound,
 } from "lucide-react";
 
 // ─── Menu item type ────────────────────────────────────────────────────
@@ -87,6 +88,7 @@ const MENUS: Record<string, MenuItem[]> = {
   ],
   CUSTOMER_DASHBOARD: [
     { label: "首页", href: "/customer", icon: LayoutDashboard },
+    { label: "客户资料", href: "/customer/profile", icon: UserRound },
     { label: "可租设备", href: "/customer/equipment", icon: Truck },
     { label: "我的询价", href: "/customer/inquiries", icon: ShoppingCart },
     { label: "我的合同", href: "/customer/contracts", icon: FileText },
