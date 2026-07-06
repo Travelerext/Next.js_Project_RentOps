@@ -37,17 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ── 1. Apply database migrations ────────────────────────────
-      - uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Push database migrations
-        run: supabase db push --db-url "$DATABASE_URL" --yes
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-      # ── 2. Rsync source code to server ──────────────────────────
+      # ── 1. Rsync source code to server ──────────────────────────
       - name: Rsync files to server
         uses: easingthemes/ssh-deploy@v5.1.0
         with:
@@ -58,7 +48,7 @@ jobs:
           TARGET: ${{ vars.DEPLOY_PATH || '/opt/rentops' }}
           EXCLUDE: .git, .github, .claude, .idea, node_modules, .env, .env.*, logs, *.md
 
-      # ── 3. Install, build & restart ─────────────────────────────
+      # ── 2. Install, build & restart ─────────────────────────────
       - name: Build & restart on server
         uses: appleboy/ssh-action@v1.2.0
         env:
