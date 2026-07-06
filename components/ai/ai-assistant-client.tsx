@@ -51,14 +51,20 @@ export function AIAssistantClient({ roleLabel, roleFocus, examples }: Props) {
       setInput("");
       setLoading(true);
 
+      let timeout: number | undefined;
       try {
+        const controller = new AbortController();
+        timeout = window.setTimeout(() => controller.abort(), 30000);
         const response = await fetch("/api/ai", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
           body: JSON.stringify({
             messages: [...apiMessages, { role: "user", content }],
           }),
         });
+        window.clearTimeout(timeout);
+        timeout = undefined;
 
         const result = (await response.json().catch(() => null)) as { answer?: string; error?: string } | null;
         if (!response.ok || !result?.answer) {
@@ -75,7 +81,9 @@ export function AIAssistantClient({ roleLabel, roleFocus, examples }: Props) {
           },
         ]);
       } catch (error) {
-        const message = error instanceof Error ? error.message : "AI 助手暂时不可用。";
+        const message = error instanceof DOMException && error.name === "AbortError"
+          ? "AI 助手响应超时，请稍后重试。"
+          : error instanceof Error ? error.message : "AI 助手暂时不可用。";
         toast(message, "error");
         setMessages((current) => [
           ...current,
@@ -86,6 +94,7 @@ export function AIAssistantClient({ roleLabel, roleFocus, examples }: Props) {
           },
         ]);
       } finally {
+        if (timeout) window.clearTimeout(timeout);
         setLoading(false);
         textareaRef.current?.focus();
       }

@@ -9,7 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, type Column } from "@/components/data/data-table";
 import { PageHeader } from "@/components/layout/page-header";
-import { createRentalOrder, addOrderItem, submitOrder } from "@/lib/actions/rental-order";
+import { createQuickRentalOrder, pricingPreview, submitOrder } from "@/lib/actions/rental-order";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { RISK_LEVELS, CREDIT_LEVELS } from "@/lib/constants";
@@ -48,7 +48,34 @@ interface SelectedEquipment {
 }
 
 interface PricingResult {
-  rentAmount: number; depositAmount: number; totalAmount: number; days: number;
+  rentAmount: number;
+  depositAmount: number;
+  totalAmount: number;
+  days: number;
+  hours: number;
+}
+
+interface PricingPreviewState {
+  totalRentAmount: number;
+  totalDepositAmount: number;
+  originalAmount: number;
+  discountAmount: number;
+  discountRate: number;
+  needsApproval: boolean;
+  approvalReasons: string[];
+  items: Array<{
+    equipmentId: string;
+    equipmentNo: string;
+    name: string;
+    quantity: number;
+    unitPrice: number;
+    standardUnitPrice: number;
+    rentAmount: number;
+    depositAmount: number;
+    days: number;
+    hours: number;
+    priceAdjusted: boolean;
+  }>;
 }
 
 type Step = "customer" | "equipment" | "pricing" | "adjust" | "review";
@@ -88,6 +115,8 @@ export default function NewOrderPage() {
   const [materialFee, setMaterialFee] = useState("0");
   const [otherFee, setOtherFee] = useState("0");
   const [remark, setRemark] = useState("");
+  const [pricingPreviewResult, setPricingPreviewResult] = useState<PricingPreviewState | null>(null);
+  const [pricingLoading, setPricingLoading] = useState(false);
 
   // ── Price adjustment ────────────────────────────────────────────
   const [adjustReason, setAdjustReason] = useState("");
@@ -164,35 +193,57 @@ export default function NewOrderPage() {
       .then(({ data }) => { if (data) setSelectedCustomer(data as CustomerOption); });
   }, [supabase, searchParams]);
 
-  const pricingResults = useMemo(() => {
-    if (step !== "pricing" && step !== "adjust" && step !== "review") return {};
-    const results: Record<string, PricingResult> = {};
-    let startMs = 0, endMs = 0;
-    if (plannedStartAt) startMs = new Date(plannedStartAt).getTime();
-    if (plannedEndAt) endMs = new Date(plannedEndAt).getTime();
-    const valid = !isNaN(startMs) && !isNaN(endMs) && endMs >= startMs;
-    const totalHours = valid ? (endMs - startMs) / (1000 * 60 * 60) : 0;
-    const days = valid ? Math.ceil((endMs - startMs) / (1000 * 60 * 60 * 24)) + 1 : 0;
+  useEffect(() => {
+    const needsPreview = step === "pricing" || step === "adjust" || step === "review";
+    if (!needsPreview || selectedEquipment.length === 0 || !plannedStartAt || !plannedEndAt) {
+      Promise.resolve().then(() => {
+        setPricingPreviewResult(null);
+        setPricingLoading(false);
+      });
+      return;
+    }
 
-    for (const item of selectedEquipment) {
-      let rent = 0;
-      switch (pricingMode) {
-        case "HOURLY": rent = item.unitPrice * Math.ceil(totalHours); break;
-        case "DAILY": rent = item.unitPrice * days; break;
-        case "MONTHLY": rent = item.unitPrice * Math.max(1, Math.ceil(days / 30)); break;
-        default: rent = item.unitPrice * Math.max(1, Math.ceil(days / 30));
+    let cancelled = false;
+    const fd = new FormData();
+    fd.set("pricingMode", pricingMode);
+    fd.set("plannedStartAt", plannedStartAt);
+    fd.set("plannedEndAt", plannedEndAt);
+    fd.set("items", JSON.stringify(selectedEquipment.map(item => ({
+      equipmentId: item.equipmentId,
+      unitPrice: item.unitPrice,
+      depositAmount: item.depositAmount,
+      quantity: 1,
+    }))));
+
+    Promise.resolve().then(() => setPricingLoading(true));
+    pricingPreview(fd).then(result => {
+      if (cancelled) return;
+      if (result.success) {
+        setPricingPreviewResult(result.data);
+        setError("");
+      } else {
+        setPricingPreviewResult(null);
+        setError(result.error);
       }
-      rent = Math.round(rent * 100) / 100;
-      const dep = Math.round(item.depositAmount * 100) / 100;
+      setPricingLoading(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [selectedEquipment, pricingMode, plannedStartAt, plannedEndAt, step]);
+
+  const pricingResults = useMemo(() => {
+    const results: Record<string, PricingResult> = {};
+    for (const item of pricingPreviewResult?.items ?? []) {
       results[item.equipmentId] = {
-        rentAmount: rent,
-        depositAmount: dep,
-        totalAmount: Math.round((rent + dep) * 100) / 100,
-        days: pricingMode === "HOURLY" ? Math.ceil(totalHours) : days,
+        rentAmount: item.rentAmount,
+        depositAmount: item.depositAmount,
+        totalAmount: item.rentAmount + item.depositAmount,
+        days: item.days,
+        hours: item.hours,
       };
     }
     return results;
-  }, [selectedEquipment, pricingMode, plannedStartAt, plannedEndAt, step]);
+  }, [pricingPreviewResult]);
 
   // ── Equipment selection ───────────────────────────────────────────
   function addEquipment(equip: EquipmentOption) {
@@ -237,39 +288,30 @@ export default function NewOrderPage() {
     setLoading(true); setError("");
     const fd = new FormData();
     if (!selectedCustomer) { setError("请选择客户"); setLoading(false); return; }
+    if (!pricingPreviewResult) { setError("请先完成服务端租金试算"); setLoading(false); return; }
+    fd.set("customerId", selectedCustomer.id);
     fd.set("pricingMode", pricingMode);
-    if (plannedStartAt) fd.set("plannedStartAt", new Date(plannedStartAt).toISOString());
-    if (plannedEndAt) fd.set("plannedEndAt", new Date(plannedEndAt).toISOString());
+    fd.set("plannedStartAt", plannedStartAt);
+    fd.set("plannedEndAt", plannedEndAt);
     fd.set("transportFee", transportFee);
     fd.set("materialFee", materialFee);
     fd.set("otherFee", otherFee);
     if (remark) fd.set("remark", remark);
     if (adjustReason) fd.set("adjustReason", adjustReason);
-    const result = await createRentalOrder(selectedCustomer.id, fd);
+    fd.set("items", JSON.stringify(selectedEquipment.map(item => ({
+      equipmentId: item.equipmentId,
+      unitPrice: item.unitPrice,
+      depositAmount: item.depositAmount,
+      quantity: 1,
+    }))));
+
+    const result = await createQuickRentalOrder(fd);
     if (!result.success) {
       setError(result.error);
       setLoading(false);
       return;
     }
     setDraftOrderId(result.data.id);
-    // Add items
-    let itemsFailed = false;
-    for (const item of selectedEquipment) {
-      const ifd = new FormData();
-      ifd.set("equipmentId", item.equipmentId);
-      ifd.set("pricingMode", item.pricingMode);
-      ifd.set("unitPrice", String(item.unitPrice));
-      ifd.set("depositAmount", String(item.depositAmount));
-      if (plannedStartAt) ifd.set("startAt", new Date(plannedStartAt).toISOString());
-      if (plannedEndAt) ifd.set("endAt", new Date(plannedEndAt).toISOString());
-      const itemResult = await addOrderItem(result.data.id, ifd);
-      if (!itemResult.success) {
-        setError(`添加设备失败：${itemResult.error}`);
-        itemsFailed = true;
-        break;
-      }
-    }
-    if (itemsFailed) { setLoading(false); return; }
     setLoading(false);
     setStep("review");
   }
@@ -279,11 +321,7 @@ export default function NewOrderPage() {
     setSubmitting(true); setError("");
     const result = await submitOrder(draftOrderId);
     if (!result.success) { setError(result.error); setSubmitting(false); return; }
-    if (result.data?.needsApproval) {
-      router.push(`/approval`);
-    } else {
-      router.push(`/sales/orders/${draftOrderId}`);
-    }
+    router.push(`/sales/orders/${draftOrderId}`);
   }
 
   // ── Step navigation with reset ──────────────────────────────────
@@ -314,8 +352,9 @@ export default function NewOrderPage() {
   function canProceed(): boolean {
     if (step === "customer") return !!selectedCustomer && !selectedCustomer.is_blacklisted && !selectedCustomer.lock_ordering;
     if (step === "equipment") return selectedEquipment.length > 0;
-    if (step === "pricing") return !!plannedStartAt && !!plannedEndAt;
+    if (step === "pricing") return !!plannedStartAt && !!plannedEndAt && !!pricingPreviewResult && !pricingLoading;
     if (step === "adjust") {
+      if (!pricingPreviewResult || pricingLoading) return false;
       const hasPriceChanges = selectedEquipment.some(item => {
         const modeStdRent = Math.round((pricingMode === "DAILY" ? item.standardRent / 30
           : pricingMode === "HOURLY" ? item.standardRent / 30 / 8
@@ -329,8 +368,8 @@ export default function NewOrderPage() {
   }
 
   // ── Totals ────────────────────────────────────────────────────────
-  const totalRent = Object.values(pricingResults).reduce((s, r) => s + r.rentAmount, 0);
-  const totalDeposit = Object.values(pricingResults).reduce((s, r) => s + r.depositAmount, 0);
+  const totalRent = pricingPreviewResult?.totalRentAmount ?? 0;
+  const totalDeposit = pricingPreviewResult?.totalDepositAmount ?? 0;
 
   // ── Render ────────────────────────────────────────────────────────
   return (
@@ -528,7 +567,7 @@ export default function NewOrderPage() {
                 <Input id="materialFee" label="材料费" type="number" value={materialFee} onChange={e => setMaterialFee(e.target.value)} />
                 <Input id="otherFee" label="其他费用" type="number" value={otherFee} onChange={e => setOtherFee(e.target.value)} />
               </div>
-              <p className="mt-2 text-xs text-zinc-400">费用将根据租期和计费方式自动计算</p>
+              <p className="mt-2 text-xs text-zinc-400">费用由服务端按租期、计费方式和设备实时状态试算</p>
             </div>
           </Card>
 
@@ -540,6 +579,10 @@ export default function NewOrderPage() {
                 <p className="p-4 text-sm text-zinc-400">请先在步骤 2 选择设备</p>
               ) : !plannedStartAt || !plannedEndAt ? (
                 <p className="p-4 text-sm text-zinc-400">请填写租期后自动计算</p>
+              ) : pricingLoading ? (
+                <p className="p-4 text-sm text-zinc-400">正在试算租金...</p>
+              ) : !pricingPreviewResult ? (
+                <p className="p-4 text-sm text-red-500">租金试算失败，请检查租期或刷新设备状态</p>
               ) : (
               <div className="flex flex-col gap-2">
                 {selectedEquipment.map(item => {
@@ -560,6 +603,12 @@ export default function NewOrderPage() {
                   <span className="text-zinc-500">+ 押金 ¥{totalDeposit.toLocaleString()}</span>
                   <span className="text-lg">= ¥{(totalRent + totalDeposit).toLocaleString()}</span>
                 </div>
+                {pricingPreviewResult.needsApproval && (
+                  <div className="rounded-lg bg-amber-50 p-2 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
+                    <AlertTriangle className="mr-1 inline h-4 w-4" />
+                    试算提示：{pricingPreviewResult.approvalReasons.join("；")}
+                  </div>
+                )}
               </div>
               )}
             </div>
@@ -709,7 +758,7 @@ export default function NewOrderPage() {
                 </div>
               )}
               {!draftOrderId && (
-                <Button variant="primary" onClick={handleCreateDraft} disabled={loading} className="w-full">
+                <Button variant="primary" onClick={handleCreateDraft} disabled={loading || pricingLoading || !pricingPreviewResult} className="w-full">
                   {loading ? "创建中..." : "创建草稿订单"} <FileText className="ml-1 h-4 w-4" />
                 </Button>
               )}
@@ -718,10 +767,10 @@ export default function NewOrderPage() {
                   <Check className="mr-1 inline h-4 w-4" />草稿订单已创建，确认无误后点击提交
                 </div>
               )}
-              {draftOrderId && adjustReason && (
+              {draftOrderId && pricingPreviewResult?.needsApproval && (
                 <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-700 dark:bg-amber-900/20 dark:text-amber-400">
                   <AlertTriangle className="mr-1 inline h-4 w-4" />
-                  该订单存在价格调整，可能需要审批。提交后系统将自动判断。
+                  该订单可能需要审批：{pricingPreviewResult.approvalReasons.join("；")}
                 </div>
               )}
               {draftOrderId && selectedCustomer?.risk_level === "HIGH" && (

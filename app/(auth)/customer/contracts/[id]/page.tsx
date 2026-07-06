@@ -1,6 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
+﻿import { createClient } from "@/lib/supabase/server";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/layout/page-header";
 import { InfoGrid } from "@/components/data/info-grid";
 import { DataTable, type Column } from "@/components/data/data-table";
@@ -8,6 +10,7 @@ import { formatDate, formatCurrency } from "@/lib/utils";
 import { CONTRACT_STATUS } from "@/lib/constants";
 import Link from "next/link";
 import { DirectionalTransition } from "@/components/layout/directional-transition";
+import { markSignTaskSignedForm } from "@/lib/actions/cr08";
 
 const itemColumns: Column<Record<string, unknown>>[] = [
   { id: "no", header: "设备编号", cell: (i) => <span className="font-mono text-sm">{i.equipment_no_snapshot as string}</span> },
@@ -52,7 +55,7 @@ export default async function CustomerContractDetailPage({ params }: { params: P
   }
 
   // Fetch related data in parallel after confirming contract exists
-  const [{ data: items }, { data: order }] = await Promise.all([
+  const [{ data: items }, { data: order }, { data: signTasks }] = await Promise.all([
     supabase.from("rental_contract_item").select("*").eq("contract_id", id),
     (async () => {
       if (!contract.order_id) return { data: null };
@@ -63,6 +66,7 @@ export default async function CustomerContractDetailPage({ params }: { params: P
         .maybeSingle();
       return { data: orderData };
     })(),
+    supabase.from("contract_sign_task").select("*").eq("contract_id", id).order("created_at", { ascending: false }),
   ]);
 
   const customer = contract.customer as unknown as { name: string; contact_name: string };
@@ -140,6 +144,29 @@ ${(items ?? []).map((i: Record<string, unknown>, idx: number) => `  ${idx + 1}. 
         </Card>
 
         <Card>
+          <CardHeader><CardTitle>电子签署</CardTitle></CardHeader>
+          <div className="space-y-3">
+            {(signTasks ?? []).map((task: Record<string, unknown>) => (
+              <div key={task.id as string} className="rounded-lg border border-app-border p-3">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="font-mono">{task.provider as string} / {task.status as string}</span>
+                  {task.sign_url ? <Link href={task.sign_url as string} className="text-app-accent hover:underline">打开签署链接</Link> : <span className="text-app-muted">线下签署</span>}
+                </div>
+                {task.status !== "SIGNED" && (
+                  <form action={markSignTaskSignedForm} className="flex flex-wrap items-end gap-3">
+                    <input type="hidden" name="taskId" value={task.id as string} />
+                    <input type="hidden" name="redirectTo" value={`/customer/contracts/${id}`} />
+                    <Input name="signedFileUrl" label="已签文件 URL" placeholder="https://..." />
+                    <Button variant="primary" type="submit">确认已签署</Button>
+                  </form>
+                )}
+              </div>
+            ))}
+            {(!signTasks || signTasks.length === 0) && <p className="text-sm text-app-muted">暂无待签署任务</p>}
+          </div>
+        </Card>
+
+        <Card>
           <CardHeader><CardTitle>设备明细（快照）</CardTitle></CardHeader>
           <DataTable columns={itemColumns} data={(items ?? []) as Record<string, unknown>[]} keyExtractor={(i) => i.id as string} emptyMessage="暂无明细" />
         </Card>
@@ -147,3 +174,4 @@ ${(items ?? []).map((i: Record<string, unknown>, idx: number) => `  ${idx + 1}. 
     </DirectionalTransition>
   );
 }
+

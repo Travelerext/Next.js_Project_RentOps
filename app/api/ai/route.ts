@@ -3,6 +3,8 @@ import { ROLE_LABELS } from "@/lib/constants";
 import { getAiRoleFocus } from "@/lib/ai/role-focus";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type ChatRole = "user" | "assistant";
 
@@ -24,6 +26,7 @@ type SupabaseServerClient = Awaited<ReturnType<typeof createClient>>;
 const DEEPSEEK_ENDPOINT =
   process.env.DEEPSEEK_API_URL ?? "https://api.deepseek.com/chat/completions";
 const DEEPSEEK_MODEL = process.env.DEEPSEEK_MODEL ?? "deepseek-v4-flash";
+const DEEPSEEK_TIMEOUT_MS = Number(process.env.DEEPSEEK_TIMEOUT_MS ?? 25000);
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -86,22 +89,34 @@ export async function POST(request: Request) {
     );
   }
 
-  const deepseekResponse = await fetch(DEEPSEEK_ENDPOINT, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
-      temperature: 0.2,
-      stream: false,
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...messages.slice(-10),
-      ],
-    }),
-  });
+  let deepseekResponse: Response;
+  try {
+    deepseekResponse = await fetch(DEEPSEEK_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(DEEPSEEK_TIMEOUT_MS),
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        temperature: 0.2,
+        stream: false,
+        messages: [
+          { role: "system", content: systemPrompt },
+          ...messages.slice(-10),
+        ],
+      }),
+    });
+  } catch (error) {
+    console.error("DeepSeek request failed:", error);
+    const timedOut = error instanceof DOMException && error.name === "TimeoutError";
+    return Response.json(
+      { error: timedOut ? "DeepSeek 响应超时，请稍后重试。" : "DeepSeek 网络请求失败，请检查服务器网络和 API 配置。" },
+      { status: timedOut ? 504 : 502 },
+    );
+  }
 
   const result = (await deepseekResponse.json().catch(() => null)) as unknown;
   if (!deepseekResponse.ok) {

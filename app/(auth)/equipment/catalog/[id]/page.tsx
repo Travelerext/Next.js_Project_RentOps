@@ -4,10 +4,12 @@ import { PageHeader } from "@/components/layout/page-header";
 import { InfoGrid } from "@/components/data/info-grid";
 import { DataTable, type Column } from "@/components/data/data-table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { EQUIPMENT_STATUS } from "@/lib/constants";
 import Link from "next/link";
 import { DirectionalTransition } from "@/components/layout/directional-transition";
+import { ALERT_STATUS, HEALTH_LEVEL, statusVariant as cr08StatusVariant, pct } from "@/lib/cr08-labels";
 
 export default async function EquipmentDetailPage({
   params,
@@ -22,6 +24,12 @@ export default async function EquipmentDetailPage({
     { data: statusLogs },
     { data: locationLogs },
     { data: documents },
+    { data: telemetry },
+    { data: healthScores },
+    { data: alerts },
+    { data: suggestions },
+    { data: policies },
+    { data: utilization },
   ] = await Promise.all([
     supabase
       .from("equipment")
@@ -45,6 +53,43 @@ export default async function EquipmentDetailPage({
       .select("*")
       .eq("equipment_id", id)
       .order("uploaded_at", { ascending: false }),
+    supabase
+      .from("equipment_telemetry_latest")
+      .select("*")
+      .eq("equipment_id", id)
+      .maybeSingle(),
+    supabase
+      .from("equipment_health_score")
+      .select("*")
+      .eq("equipment_id", id)
+      .order("calculated_at", { ascending: false })
+      .limit(1),
+    supabase
+      .from("equipment_alert")
+      .select("*")
+      .eq("equipment_id", id)
+      .in("status", ["OPEN", "ACKNOWLEDGED", "PROCESSING"])
+      .order("occurred_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("predictive_maintenance_suggestion")
+      .select("*")
+      .eq("equipment_id", id)
+      .in("status", ["OPEN", "CONFIRMED"])
+      .order("suggested_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("equipment_insurance_policy")
+      .select("*")
+      .eq("equipment_id", id)
+      .order("end_date", { ascending: false })
+      .limit(1),
+    supabase
+      .from("equipment_utilization_snapshot")
+      .select("*")
+      .eq("equipment_id", id)
+      .order("period_end", { ascending: false })
+      .limit(1),
   ]);
 
   if (!equip) {
@@ -65,6 +110,9 @@ export default async function EquipmentDetailPage({
   const warehouse = equip.warehouse as unknown as { name: string } | null;
   const station = equip.station as unknown as { name: string } | null;
   const customer = equip.current_customer as unknown as { name: string } | null;
+  const latestHealth = healthScores?.[0] as Record<string, unknown> | undefined;
+  const latestPolicy = policies?.[0] as Record<string, unknown> | undefined;
+  const latestUtilization = utilization?.[0] as Record<string, unknown> | undefined;
 
   const statusVariant =
     equip.status === "IN_STOCK" ? "success" :
@@ -96,7 +144,52 @@ export default async function EquipmentDetailPage({
           subtitle={equip.equipment_no as string}
           backUrl="_back"
           status={<Badge variant={statusVariant}>{EQUIPMENT_STATUS[equip.status as string] ?? String(equip.status)}</Badge>}
+          actions={
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/equipment/catalog/${id}/iot`}><Button variant="outline">IoT</Button></Link>
+              <Link href={`/equipment/catalog/${id}/tracking`}><Button variant="outline">轨迹</Button></Link>
+              <Link href={`/equipment/catalog/${id}/insurance`}><Button variant="outline">保险</Button></Link>
+              <Link href={`/equipment/catalog/${id}/utilization`}><Button variant="outline">利用率</Button></Link>
+            </div>
+          }
         />
+
+        <Card>
+          <CardHeader><CardTitle>智能监控</CardTitle></CardHeader>
+          <InfoGrid
+            items={[
+              {
+                label: "健康分",
+                value: latestHealth ? (
+                  <Badge variant={cr08StatusVariant(latestHealth.score_level as string)}>
+                    {latestHealth.score as number} / {HEALTH_LEVEL[latestHealth.score_level as string] ?? latestHealth.score_level as string}
+                  </Badge>
+                ) : "-",
+              },
+              { label: "最新上报", value: telemetry?.reported_at ? formatDate(telemetry.reported_at as string) : "-" },
+              { label: "GPS", value: telemetry?.latitude && telemetry?.longitude ? `${telemetry.latitude}, ${telemetry.longitude}` : "-" },
+              { label: "运行小时", value: telemetry?.engine_hours ? `${telemetry.engine_hours}h` : "-" },
+              { label: "未关闭告警", value: <Link href="/equipment/alerts" className="text-app-accent hover:underline">{alerts?.length ?? 0} 条</Link> },
+              { label: "预测维护", value: suggestions?.length ? `${suggestions.length} 条建议` : "-" },
+              { label: "保险到期", value: latestPolicy ? formatDate(latestPolicy.end_date as string) : "-" },
+              { label: "最新利用率", value: latestUtilization ? pct(latestUtilization.nominal_utilization as string) : "-" },
+            ]}
+          />
+        </Card>
+
+        {alerts && alerts.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle>活动告警</CardTitle></CardHeader>
+            <div className="space-y-2">
+              {alerts.map((alert: Record<string, unknown>) => (
+                <Link key={alert.id as string} href={`/equipment/alerts/${alert.id}`} className="flex items-center justify-between rounded-lg border border-app-border px-3 py-2 text-sm hover:bg-app-surface-muted">
+                  <span className="font-medium text-app-fg">{alert.title as string}</span>
+                  <Badge variant={cr08StatusVariant(alert.status as string)}>{ALERT_STATUS[alert.status as string] ?? alert.status as string}</Badge>
+                </Link>
+              ))}
+            </div>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Card>

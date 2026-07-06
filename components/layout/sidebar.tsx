@@ -11,7 +11,7 @@ import {
   UserPlus, ShoppingCart, AlertTriangle, BarChart3, ClipboardList,
   Calendar, Shield, CreditCard, Receipt, Banknote, ArrowLeftRight,
   Boxes, Gauge, Calculator, TrendingUp, ListChecks,
-  History, PlusCircle, BrainCircuit, type LucideIcon,
+  History, PlusCircle, BrainCircuit, MapPin, RadioTower, type LucideIcon,
 } from "lucide-react";
 
 // ─── Menu item type ────────────────────────────────────────────────────
@@ -38,6 +38,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "客户管理", href: "/sales/customers", icon: Users,
       children: [{ label: "客户列表", href: "/sales/customers" }, { label: "新建客户", href: "/sales/customers/new" }] },
     { label: "可租设备", href: "/sales/available-equipment", icon: Truck },
+    { label: "客户询价", href: "/sales/inquiries", icon: ClipboardList },
     { label: "租赁订单", href: "/sales/orders", icon: ShoppingCart,
       children: [{ label: "订单列表", href: "/sales/orders" }, { label: "快速开单", href: "/sales/orders/new" }] },
     { label: "合同管理", href: "/sales/contracts", icon: FileText },
@@ -47,6 +48,10 @@ const MENUS: Record<string, MenuItem[]> = {
   EQUIPMENT_DASHBOARD: [
     { label: "工作台", href: "/equipment", icon: LayoutDashboard },
     { label: "设备台账", href: "/equipment/catalog", icon: Package },
+    { label: "IoT 终端", href: "/equipment/iot/devices", icon: RadioTower },
+    { label: "设备地图", href: "/equipment/map", icon: MapPin },
+    { label: "电子围栏", href: "/equipment/geofences", icon: MapPin },
+    { label: "设备告警", href: "/equipment/alerts", icon: AlertTriangle },
     { label: "新增设备", href: "/equipment/catalog/new", icon: UserPlus },
     { label: "扫码出库", href: "/equipment/scan/outbound", icon: Scan },
     { label: "扫码入库", href: "/equipment/scan/inbound", icon: Scan },
@@ -59,6 +64,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "发票管理", href: "/finance/invoices", icon: FileText },
     { label: "押金管理", href: "/finance/deposits", icon: Banknote },
     { label: "退款管理", href: "/finance/refunds", icon: DollarSign },
+    { label: "保险管理", href: "/finance/insurance", icon: Shield },
     { label: "退租结算", href: "/finance/settlement", icon: Calculator },
     { label: "对账单", href: "/finance/reconciliation", icon: FileText },
     { label: "折旧", href: "/finance/depreciation", icon: Gauge },
@@ -69,6 +75,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "我的工单", href: "/maintenance/work-orders?mine=1", icon: ClipboardList },
     { label: "全部工单", href: "/maintenance/work-orders", icon: Wrench,
       children: [{ label: "工单列表", href: "/maintenance/work-orders" }, { label: "新建报修", href: "/maintenance/work-orders/new" }] },
+    { label: "预测维护", href: "/maintenance/predictive", icon: BrainCircuit },
     { label: "保养计划", href: "/maintenance/plans", icon: Calendar },
     { label: "配件库存", href: "/maintenance/spare-parts", icon: Boxes },
     { label: "配件流水", href: "/maintenance/spare-parts/movements", icon: ArrowLeftRight },
@@ -80,9 +87,12 @@ const MENUS: Record<string, MenuItem[]> = {
   ],
   CUSTOMER_DASHBOARD: [
     { label: "首页", href: "/customer", icon: LayoutDashboard },
+    { label: "可租设备", href: "/customer/equipment", icon: Truck },
+    { label: "我的询价", href: "/customer/inquiries", icon: ShoppingCart },
     { label: "我的合同", href: "/customer/contracts", icon: FileText },
     { label: "账单查询", href: "/customer/bills", icon: DollarSign },
     { label: "发票管理", href: "/customer/invoices", icon: Receipt },
+    { label: "我的报修", href: "/customer/repairs", icon: Wrench },
   ],
 
   // ─── Supervisor dashboard menus (5 new - only links to existing pages) ──
@@ -90,6 +100,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "工作台", href: "/maintenance", icon: LayoutDashboard },
     { label: "待派单队列", href: "/maintenance/work-orders?status=PENDING_DISPATCH", icon: ClipboardList },
     { label: "全部工单", href: "/maintenance/work-orders", icon: Wrench },
+    { label: "预测维护", href: "/maintenance/predictive", icon: BrainCircuit },
     { label: "新建报修", href: "/maintenance/work-orders/new", icon: PlusCircle },
     { label: "保养计划", href: "/maintenance/plans", icon: Calendar },
     { label: "配件库存", href: "/maintenance/spare-parts", icon: Boxes },
@@ -100,6 +111,7 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "待审批", href: "/approval/pending", icon: ClipboardList },
     { label: "已审批", href: "/approval/history", icon: CheckSquare },
     { label: "订单管理", href: "/sales/orders", icon: ShoppingCart },
+    { label: "客户询价", href: "/sales/inquiries", icon: ClipboardList },
     { label: "合同管理", href: "/sales/contracts", icon: FileText },
     { label: "客户管理", href: "/sales/customers", icon: Users },
     { label: "业务报表", href: "/sales/reports", icon: BarChart3 },
@@ -118,6 +130,10 @@ const MENUS: Record<string, MenuItem[]> = {
   EQUIPMENT_SUPERVISOR_DASHBOARD: [
     { label: "工作台", href: "/equipment", icon: LayoutDashboard },
     { label: "设备台账", href: "/equipment/catalog", icon: Package },
+    { label: "IoT 终端", href: "/equipment/iot/devices", icon: RadioTower },
+    { label: "设备地图", href: "/equipment/map", icon: MapPin },
+    { label: "电子围栏", href: "/equipment/geofences", icon: MapPin },
+    { label: "设备告警", href: "/equipment/alerts", icon: AlertTriangle },
     { label: "新增设备", href: "/equipment/catalog/new", icon: PlusCircle },
     { label: "设备调拨", href: "/equipment/transfers", icon: ArrowLeftRight },
     { label: "扫码出库", href: "/equipment/scan/outbound", icon: Scan },
@@ -128,6 +144,8 @@ const MENUS: Record<string, MenuItem[]> = {
     { label: "待审批", href: "/approval/pending", icon: ClipboardList },
     { label: "已审批", href: "/approval/history", icon: CheckSquare },
     { label: "经营报表", href: "/sales/reports", icon: BarChart3 },
+    { label: "健康报表", href: "/reports/equipment-health", icon: Gauge },
+    { label: "利用率报表", href: "/reports/equipment-utilization", icon: BarChart3 },
     { label: "审计日志", href: "/admin/audit-log", icon: History },
   ],
 };
@@ -144,6 +162,7 @@ const ROLE_EXTRA_LINKS: Record<string, MenuItem[]> = {
     { label: "收款记录", href: "/finance/payments", icon: CreditCard },
     { label: "发票管理", href: "/finance/invoices", icon: FileText },
     { label: "退款管理", href: "/finance/refunds", icon: DollarSign },
+    { label: "保险管理", href: "/finance/insurance", icon: Shield },
   ],
   GENERAL_MANAGER: [
     { label: "经营看板", href: "/sales/reports", icon: BarChart3 },

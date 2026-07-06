@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { RECEIVABLE_STATUS } from "@/lib/constants";
+import Link from "next/link";
 
 export default async function CustomerBillsPage() {
   const supabase = await createClient();
@@ -17,7 +18,7 @@ export default async function CustomerBillsPage() {
       <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">账单查询</h1>
       <div className="space-y-3">
         {(receivables ?? []).map((r) => (
-          <div key={r.id} className="rounded-lg border border-zinc-200 p-4 dark:border-zinc-700">
+          <Link key={r.id} href={`/customer/bills/${r.id}`} className="block rounded-lg border border-zinc-200 p-4 transition-colors hover:border-app-border-strong hover:bg-app-surface-muted/50 dark:border-zinc-700">
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-mono text-sm font-medium">{r.receivable_no}</p>
@@ -30,7 +31,7 @@ export default async function CustomerBillsPage() {
                 </Badge>
               </div>
             </div>
-          </div>
+          </Link>
         ))}
         {(!receivables || receivables.length === 0) && (
           <p className="py-8 text-center text-zinc-500">暂无账单</p>
