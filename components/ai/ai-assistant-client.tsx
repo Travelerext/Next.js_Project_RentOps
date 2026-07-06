@@ -19,6 +19,24 @@ interface Props {
   examples: string[];
 }
 
+function createMessageId() {
+  const webCrypto = globalThis.crypto;
+
+  if (typeof webCrypto?.randomUUID === "function") {
+    return webCrypto.randomUUID();
+  }
+
+  if (typeof webCrypto?.getRandomValues === "function") {
+    const bytes = webCrypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] % 16) + 64;
+    bytes[8] = (bytes[8] % 64) + 128;
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"));
+    return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+  }
+
+  return `message-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 export function AIAssistantClient({ roleLabel, roleFocus, examples }: Props) {
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([
@@ -43,7 +61,7 @@ export function AIAssistantClient({ roleLabel, roleFocus, examples }: Props) {
       if (!content || loading) return;
 
       const userMessage: Message = {
-        id: crypto.randomUUID(),
+        id: createMessageId(),
         role: "user",
         content,
       };
@@ -75,7 +93,7 @@ export function AIAssistantClient({ roleLabel, roleFocus, examples }: Props) {
         setMessages((current) => [
           ...current,
           {
-            id: crypto.randomUUID(),
+            id: createMessageId(),
             role: "assistant",
             content: answer,
           },
@@ -88,7 +106,7 @@ export function AIAssistantClient({ roleLabel, roleFocus, examples }: Props) {
         setMessages((current) => [
           ...current,
           {
-            id: crypto.randomUUID(),
+            id: createMessageId(),
             role: "assistant",
             content: `暂时无法完成请求：${message}`,
           },
