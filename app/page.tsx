@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { DASHBOARD_ROUTES } from "@/lib/constants";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const supabase = await createClient();
 

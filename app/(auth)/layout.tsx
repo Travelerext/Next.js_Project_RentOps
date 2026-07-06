@@ -2,6 +2,8 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AuthShell } from "@/components/layout/auth-shell";
 
+export const dynamic = "force-dynamic";
+
 // Map primary_role to dashboard name for the sidebar
 const ROLE_TO_DASHBOARD: Record<string, string> = {
   SYSTEM_ADMIN: "ADMIN_DASHBOARD",
