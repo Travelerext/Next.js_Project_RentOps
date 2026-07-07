@@ -55,7 +55,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   }
 
   const [orderResult, itemsResult, contractResult, invoiceResult] = await Promise.all([
-    supabase.from("rental_order").select("*, customer:customer_id(id, name, customer_no, contact_name, contact_phone, tax_no, invoice_title, invoice_address_phone, invoice_bank_account)").eq("id", id).single(),
+    supabase.from("rental_order").select("*, customer:customer_id(id, name, customer_no, contact_name, contact_phone, tax_no, invoice_title, invoice_address_phone, invoice_bank_account)").eq("id", id).is("deleted_at", null).single(),
     supabase.from("rental_order_item").select("*, equipment:equipment_id(equipment_no, name, brand)").eq("order_id", id),
     supabase.from("rental_contract").select("id, contract_no, contract_status").eq("order_id", id).maybeSingle(),
     supabase.from("invoice_record").select("id, invoice_no").eq("order_id", id).maybeSingle(),

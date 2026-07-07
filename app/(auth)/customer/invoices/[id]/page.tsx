@@ -1,29 +1,45 @@
-﻿import Link from "next/link";
-import { Plus } from "lucide-react";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { DataPage } from "@/components/data/data-page";
-import { DataTable, type Column } from "@/components/data/data-table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { formatCurrency, formatDateTime } from "@/lib/utils";
-import { INQUIRY_STATUS, statusVariant } from "@/lib/operation-labels";
+import { PageHeader } from "@/components/layout/page-header";
+import { InvoiceDocument, type InvoiceDocumentData } from "@/components/invoice/invoice-document";
+import { InvoicePrintButton } from "@/components/invoice/invoice-print-button";
 
-export default async function CustomerInquiriesPage() {
+export default async function CustomerInvoiceDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("supabase_user_id", user.id)
+    .maybeSingle();
+
+  const { data: customer } = profile
+    ? await supabase.from("customer").select("id").eq("owner_user_id", profile.id).is("deleted_at", null).maybeSingle()
+    : { data: null };
+  if (!customer) notFound();
+
   const { data } = await supabase
-    .from("rental_inquiry")
-    .select("*")
-    .order("created_at", { ascending: false });
-  const columns: Column<Record<string, unknown>>[] = [
-    { id: "no", header: "询价单号", cell: (row) => <span className="font-mono text-sm">{row.inquiry_no as string}</span> },
-    { id: "location", header: "项目地点", cell: (row) => (row.project_location as string) ?? "-" },
-    { id: "amount", header: "预估金额", cell: (row) => formatCurrency(row.estimated_amount as string) },
-    { id: "status", header: "状态", cell: (row) => <Badge variant={statusVariant(row.status as string)}>{INQUIRY_STATUS[row.status as string] ?? row.status as string}</Badge> },
-    { id: "time", header: "提交时间", cell: (row) => formatDateTime(row.created_at as string), hideOnMobile: true },
-  ];
+    .from("invoice_record")
+    .select("*, customer:customer_id(name), order:order_id(order_no), contract:contract_id(contract_no)")
+    .eq("id", id)
+    .eq("customer_id", customer.id)
+    .maybeSingle();
+
+  if (!data) notFound();
+  const invoice = data as unknown as InvoiceDocumentData;
+
   return (
-    <DataPage title="我的询价" actions={<Link href="/customer/inquiries/new"><Button variant="primary"><Plus className="h-4 w-4" />提交询价</Button></Link>} fab={{ href: "/customer/inquiries/new", label: "提交询价" }} empty={false}>
-      <DataTable columns={columns} data={(data ?? []) as Record<string, unknown>[]} keyExtractor={(row) => row.id as string} emptyMessage="暂无询价记录" />
-    </DataPage>
+    <div className="space-y-6">
+      <PageHeader
+        title="发票详情"
+        subtitle={invoice.invoice_no}
+        backUrl="_back"
+        actions={<InvoicePrintButton invoiceId={invoice.id} />}
+      />
+      <InvoiceDocument invoice={invoice} />
+    </div>
   );
 }

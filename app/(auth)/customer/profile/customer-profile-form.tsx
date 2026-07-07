@@ -56,8 +56,8 @@ export function CustomerProfileForm({ customer }: { customer: CustomerProfile | 
       return;
     }
     toast("客户资料已绑定", "success");
-    router.refresh();
-  }, [router, toast]);
+    window.location.assign("/customer/profile");
+  }, [toast]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -107,7 +107,7 @@ export function CustomerProfileForm({ customer }: { customer: CustomerProfile | 
           </div>
         ) : (
           <form onSubmit={handleBind} className="space-y-4">
-            <Input name="customerNo" label="客户编号 *" placeholder="例如 CUS202..." error={bindErrors.customerNo?.[0]} required />
+            <Input name="customerNo" label="客户编号 *" placeholder="例如 CUS-KH001 或 CUS202..." error={bindErrors.customerNo?.[0]} required />
             <Input name="contactPhone" label="登记联系电话" error={bindErrors.contactPhone?.[0]} />
             <Input name="taxNo" label="纳税人识别号" error={bindErrors.taxNo?.[0]} />
             <Button type="submit" variant="outline" disabled={binding} className="w-full">

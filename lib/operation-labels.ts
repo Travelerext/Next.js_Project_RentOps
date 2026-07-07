@@ -32,6 +32,7 @@ export const INQUIRY_STATUS: Record<string, string> = {
   QUOTED: "已报价",
   CONVERTED: "已转订单",
   CLOSED: "已关闭",
+  CANCELLED: "已撤销",
 };
 
 export const VOUCHER_STATUS: Record<string, string> = {

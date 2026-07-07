@@ -48,10 +48,6 @@ const bindCustomerSchema = z.object({
   path: ["contactPhone"],
 });
 
-function normalizeDigits(value: string | null | undefined) {
-  return String(value ?? "").replace(/\D/g, "");
-}
-
 async function requireCustomerAuth() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -172,9 +168,6 @@ export async function upsertMyCustomerProfile(formData: FormData): Promise<Actio
 }
 
 export async function bindMyExistingCustomer(formData: FormData): Promise<ActionResult<null>> {
-  const auth = await requireCustomerAuth();
-  if ("error" in auth) return { success: false, error: auth.error ?? "未登录" };
-
   const parsed = bindCustomerSchema.safeParse({
     customerNo: formData.get("customerNo"),
     contactPhone: (formData.get("contactPhone") as string) || undefined,
@@ -188,43 +181,18 @@ export async function bindMyExistingCustomer(formData: FormData): Promise<Action
     };
   }
 
-  const admin = createAdminClient();
-  const { data: current } = await admin
-    .from("customer")
-    .select("id")
-    .eq("owner_user_id", auth.profileId)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (current?.id) return { success: false, error: "当前账号已经绑定客户资料" };
-
-  const { data: customer } = await admin
-    .from("customer")
-    .select("id, owner_user_id, contact_phone, tax_no")
-    .eq("customer_no", parsed.data.customerNo)
-    .is("deleted_at", null)
-    .maybeSingle();
-
-  if (!customer) return { success: false, error: "未找到匹配的客户编号" };
-  if (customer.owner_user_id && customer.owner_user_id !== auth.profileId) {
-    return { success: false, error: "该客户资料已绑定其他账号" };
-  }
-
-  const phoneMatches = parsed.data.contactPhone
-    ? normalizeDigits(parsed.data.contactPhone) === normalizeDigits(customer.contact_phone as string | null)
-    : false;
-  const taxMatches = parsed.data.taxNo
-    ? parsed.data.taxNo.toUpperCase() === String(customer.tax_no ?? "").toUpperCase()
-    : false;
-
-  if (!phoneMatches && !taxMatches) {
-    return { success: false, error: "客户编号与联系电话/税号不匹配" };
-  }
-
-  const { error } = await admin
-    .from("customer")
-    .update({ owner_user_id: auth.profileId, updated_by: auth.profileId, updated_at: new Date().toISOString() })
-    .eq("id", customer.id);
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("bind_existing_customer_to_current_user", {
+    p_customer_no: parsed.data.customerNo,
+    p_contact_phone: parsed.data.contactPhone ?? null,
+    p_tax_no: parsed.data.taxNo ?? null,
+  });
   if (error) return { success: false, error: error.message };
+
+  const result = data as { success?: boolean; error?: string } | null;
+  if (!result?.success) {
+    return { success: false, error: result?.error ?? "客户资料绑定失败" };
+  }
 
   revalidatePath("/customer");
   revalidatePath("/customer/profile");

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { ToastProvider } from "@/components/ui/toast";
 import "./globals.css";
 
@@ -33,7 +34,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full">
-        <script
+        <Script
+          id="rentops-theme-init"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html:
               "try{var t=localStorage.getItem('rentops-theme');if(t==='light'||t==='dark'){document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t}else{document.documentElement.removeAttribute('data-theme');document.documentElement.style.colorScheme='light dark'}}catch(e){}",

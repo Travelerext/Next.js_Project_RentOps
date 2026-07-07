@@ -1,0 +1,3 @@
+ALTER TABLE public.rental_inquiry
+  ADD COLUMN IF NOT EXISTS pricing_mode VARCHAR(30) NOT NULL DEFAULT 'MONTHLY';
+

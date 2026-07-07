@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, createContext, useContext } from "react";
+import { useState, useCallback, useEffect, createContext, useContext, useRef } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 
@@ -31,13 +31,22 @@ interface Props {
 const COLLAPSED_KEY = "sidebar-collapsed";
 
 export function AuthShell({ children, displayName, dashboard, primaryRole }: Props) {
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem(COLLAPSED_KEY) === "true";
-  });
+  const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const readyToPersist = useRef(false);
 
   useEffect(() => {
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      setCollapsed(localStorage.getItem(COLLAPSED_KEY) === "true");
+      readyToPersist.current = true;
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!readyToPersist.current) return;
     localStorage.setItem(COLLAPSED_KEY, String(collapsed));
   }, [collapsed]);
 

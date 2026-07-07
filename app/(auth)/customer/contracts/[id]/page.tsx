@@ -21,6 +21,50 @@ const itemColumns: Column<Record<string, unknown>>[] = [
   { id: "rent", header: "租金小计", cell: (i) => <span className="tabular-nums">{formatCurrency(i.rent_amount as string)}</span> },
 ];
 
+const SIGN_TASK_STATUS: Record<string, string> = {
+  PENDING: "待签署",
+  SIGNED: "已签署",
+};
+
+function signTaskColumns(contractId: string): Column<Record<string, unknown>>[] {
+  return [
+    { id: "provider", header: "签署方式", cell: (task) => task.provider as string },
+    {
+      id: "status",
+      header: "状态",
+      cell: (task) => {
+        const status = task.status as string;
+        return <Badge variant={status === "SIGNED" ? "success" : "warning"}>{SIGN_TASK_STATUS[status] ?? status}</Badge>;
+      },
+    },
+    {
+      id: "link",
+      header: "签署链接",
+      cell: (task) => task.sign_url ? (
+        <Link href={task.sign_url as string} className="text-app-accent hover:underline">
+          打开签署链接
+        </Link>
+      ) : (
+        <span className="text-app-muted">线下签署</span>
+      ),
+    },
+    {
+      id: "action",
+      header: "操作",
+      cell: (task) => task.status !== "SIGNED" ? (
+        <form action={markSignTaskSignedForm} className="flex flex-wrap items-end gap-2">
+          <input type="hidden" name="taskId" value={task.id as string} />
+          <input type="hidden" name="redirectTo" value={`/customer/contracts/${contractId}`} />
+          <Input name="signedFileUrl" label="已签文件 URL" placeholder="https://..." />
+          <Button variant="primary" size="sm" type="submit">确认已签署</Button>
+        </form>
+      ) : (
+        <span className="text-sm text-app-muted">已完成</span>
+      ),
+    },
+  ];
+}
+
 export default async function CustomerContractDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createClient();
@@ -149,25 +193,7 @@ ${(items ?? []).map((i: Record<string, unknown>, idx: number) => `  ${idx + 1}. 
 
         <Card>
           <CardHeader><CardTitle>电子签署</CardTitle></CardHeader>
-          <div className="space-y-3">
-            {(signTasks ?? []).map((task: Record<string, unknown>) => (
-              <div key={task.id as string} className="rounded-lg border border-app-border p-3">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-sm">
-                  <span className="font-mono">{task.provider as string} / {task.status as string}</span>
-                  {task.sign_url ? <Link href={task.sign_url as string} className="text-app-accent hover:underline">打开签署链接</Link> : <span className="text-app-muted">线下签署</span>}
-                </div>
-                {task.status !== "SIGNED" && (
-                  <form action={markSignTaskSignedForm} className="flex flex-wrap items-end gap-3">
-                    <input type="hidden" name="taskId" value={task.id as string} />
-                    <input type="hidden" name="redirectTo" value={`/customer/contracts/${id}`} />
-                    <Input name="signedFileUrl" label="已签文件 URL" placeholder="https://..." />
-                    <Button variant="primary" type="submit">确认已签署</Button>
-                  </form>
-                )}
-              </div>
-            ))}
-            {(!signTasks || signTasks.length === 0) && <p className="text-sm text-app-muted">暂无待签署任务</p>}
-          </div>
+          <DataTable columns={signTaskColumns(id)} data={(signTasks ?? []) as Record<string, unknown>[]} keyExtractor={(task) => task.id as string} emptyMessage="暂无待签署任务" />
         </Card>
 
         <Card>

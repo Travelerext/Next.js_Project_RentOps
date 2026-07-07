@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Tr } from "@/components/ui/table";
-import type { ReactNode } from "react";
+import type { MouseEvent, ReactNode } from "react";
 
 interface ClickableTrProps {
   href?: string;
@@ -15,7 +15,14 @@ interface ClickableTrProps {
 export function ClickableTr({ href, onClick, className, children }: ClickableTrProps) {
   const router = useRouter();
 
-  const handleClick = () => {
+  const handleClick = (event: MouseEvent<HTMLTableRowElement>) => {
+    const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      target.closest("a, button, input, select, textarea, label, [role='button']")
+    ) {
+      return;
+    }
     if (onClick) {
       onClick();
     } else if (href) {

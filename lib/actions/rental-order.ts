@@ -52,6 +52,38 @@ interface PricingPreviewResult {
   items: PricingLine[];
 }
 
+export interface InquiryOrderPrefill {
+  inquiry: {
+    id: string;
+    inquiryNo: string;
+    pricingMode: string;
+    plannedStartAt: string | null;
+    plannedEndAt: string | null;
+    projectLocation: string | null;
+    remark: string | null;
+  };
+  customer: {
+    id: string;
+    name: string;
+    customer_no: string;
+    risk_level: string;
+    is_blacklisted: boolean;
+    lock_ordering: boolean;
+    credit_level: string;
+    lock_reason: string | null;
+  };
+  items: Array<{
+    equipmentId: string;
+    equipmentNo: string;
+    name: string;
+    brand: string | null;
+    standardRent: number;
+    standardDeposit: number;
+    categoryId: string;
+    estimatedUnitPrice: number | null;
+  }>;
+}
+
 function toMoney(value: unknown): number {
   const num = typeof value === "number" ? value : parseFloat(String(value ?? "0"));
   return Number.isFinite(num) ? num : 0;
@@ -492,6 +524,21 @@ export async function createQuickRentalOrder(
   if (customer.is_blacklisted) return { success: false, error: "黑名单客户不能开单" };
   if (customer.lock_ordering) return { success: false, error: "客户已被锁定，不能开单" };
 
+  const sourceInquiryId = ((formData.get("sourceInquiryId") as string) || "").trim();
+  const { data: sourceInquiry } = sourceInquiryId
+    ? await supabase
+        .from("rental_inquiry")
+        .select("id, customer_id, status, converted_order_id")
+        .eq("id", sourceInquiryId)
+        .maybeSingle()
+    : { data: null };
+  if (sourceInquiryId) {
+    if (!sourceInquiry) return { success: false, error: "来源询价不存在或无权限访问" };
+    if (sourceInquiry.customer_id !== customerId) return { success: false, error: "来源询价与当前客户不一致" };
+    if (sourceInquiry.converted_order_id || sourceInquiry.status === "CONVERTED") return { success: false, error: "来源询价已转为订单" };
+    if (["CANCELLED", "CLOSED"].includes(sourceInquiry.status as string)) return { success: false, error: "来源询价已撤销或关闭" };
+  }
+
   const preview = await buildPricingPreview(
     supabase,
     parsedItems.data,
@@ -569,9 +616,45 @@ export async function createQuickRentalOrder(
 
   const { error: itemsError } = await supabase.from("rental_order_item").insert(itemRows);
   if (itemsError) {
-    await supabase.from("rental_order_item").delete().eq("order_id", order.id);
-    await supabase.from("rental_order").delete().eq("id", order.id);
+    await supabase
+      .from("rental_order")
+      .update({
+        order_status: "CANCELLED",
+        deleted_at: new Date().toISOString(),
+        updated_by: profile.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", order.id);
     return { success: false, error: itemsError.message };
+  }
+
+  if (sourceInquiryId) {
+    const { data: updatedInquiry, error: inquiryError } = await supabase
+      .from("rental_inquiry")
+      .update({
+        status: "CONVERTED",
+        converted_order_id: order.id,
+        updated_by: profile.id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", sourceInquiryId)
+      .eq("customer_id", customerId)
+      .is("converted_order_id", null)
+      .not("status", "in", "(CONVERTED,CANCELLED,CLOSED)")
+      .select("id")
+      .maybeSingle();
+    if (inquiryError || !updatedInquiry) {
+      await supabase
+        .from("rental_order")
+        .update({
+          order_status: "CANCELLED",
+          deleted_at: new Date().toISOString(),
+          updated_by: profile.id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", order.id);
+      return { success: false, error: inquiryError?.message ?? "来源询价状态已变化，请刷新后重试" };
+    }
   }
 
   await supabase.from("audit_log").insert({
@@ -592,6 +675,12 @@ export async function createQuickRentalOrder(
   revalidatePath("/sales");
   revalidatePath("/sales/orders");
   revalidatePath(`/sales/orders/${order.id}`);
+  if (sourceInquiryId) {
+    revalidatePath("/sales/inquiries");
+    revalidatePath(`/sales/inquiries/${sourceInquiryId}`);
+    revalidatePath("/customer/inquiries");
+    revalidatePath(`/customer/inquiries/${sourceInquiryId}`);
+  }
 
   return { success: true, data: { id: order.id, orderNo: order.order_no } };
 }
@@ -882,6 +971,131 @@ export async function pricingPreview(
   );
 }
 
+export async function getInquiryOrderPrefill(
+  inquiryId: string
+): Promise<ActionResult<InquiryOrderPrefill>> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { success: false, error: "未登录" };
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, primary_role")
+    .eq("supabase_user_id", user.id)
+    .maybeSingle();
+  if (!profile) return { success: false, error: "用户档案不存在" };
+
+  const role = profile.primary_role ?? "";
+  if (!["SALES", "SALES_MANAGER", "SYSTEM_ADMIN"].includes(role)) {
+    return { success: false, error: "无权转化询价" };
+  }
+
+  if (!inquiryId || inquiryId.length < 10) {
+    return { success: false, error: "询价ID无效" };
+  }
+
+  const { data: inquiry, error: inquiryError } = await supabase
+    .from("rental_inquiry")
+    .select("id, inquiry_no, customer_id, planned_start_at, planned_end_at, project_location, remark, status, converted_order_id")
+    .eq("id", inquiryId)
+    .maybeSingle();
+
+  if (inquiryError) return { success: false, error: inquiryError.message };
+  if (!inquiry) return { success: false, error: "来源询价不存在或无权访问" };
+  if (inquiry.converted_order_id || inquiry.status === "CONVERTED") {
+    return { success: false, error: "该询价已转为订单" };
+  }
+  if (["CANCELLED", "CLOSED"].includes(inquiry.status as string)) {
+    return { success: false, error: "该询价已撤销或关闭，不能转为订单" };
+  }
+
+  let pricingMode = "MONTHLY";
+  const { data: pricingData } = await supabase
+    .from("rental_inquiry")
+    .select("pricing_mode")
+    .eq("id", inquiryId)
+    .maybeSingle();
+  if (pricingData?.pricing_mode) {
+    pricingMode = String(pricingData.pricing_mode);
+  }
+
+  const { data: customer, error: customerError } = await supabase
+    .from("customer")
+    .select("id, name, customer_no, risk_level, is_blacklisted, lock_ordering, credit_level, lock_reason")
+    .eq("id", inquiry.customer_id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (customerError) return { success: false, error: customerError.message };
+  if (!customer) return { success: false, error: "来源询价客户不存在或无权访问" };
+
+  const { data: inquiryItems, error: itemsError } = await supabase
+    .from("rental_inquiry_item")
+    .select("id, equipment_id, estimated_unit_price")
+    .eq("inquiry_id", inquiryId);
+  if (itemsError) return { success: false, error: itemsError.message };
+
+  const equipmentIds = Array.from(new Set((inquiryItems ?? []).map((item) => item.equipment_id).filter(Boolean)));
+  const { data: equipmentRows, error: equipmentError } = equipmentIds.length > 0
+    ? await supabase
+        .from("equipment")
+        .select("id, equipment_no, name, brand, standard_rent, standard_deposit, category_id, status, scrapped, deleted_at")
+        .in("id", equipmentIds)
+    : { data: [], error: null };
+  if (equipmentError) return { success: false, error: equipmentError.message };
+
+  const equipmentById = new Map((equipmentRows ?? []).map((equipment) => [equipment.id as string, equipment]));
+  const items = (inquiryItems ?? [])
+    .map((item) => {
+      const equipment = item.equipment_id ? equipmentById.get(item.equipment_id as string) : null;
+      if (!equipment || !item.equipment_id) return null;
+      if (equipment.deleted_at) return null;
+
+      const standardRent = toMoney(equipment.standard_rent);
+      const standardDeposit = toMoney(equipment.standard_deposit);
+      const estimatedUnitPrice = toMoney(item.estimated_unit_price);
+      return {
+        equipmentId: item.equipment_id as string,
+        equipmentNo: String(equipment.equipment_no ?? ""),
+        name: String(equipment.name ?? ""),
+        brand: equipment.brand ? String(equipment.brand) : null,
+        standardRent,
+        standardDeposit,
+        categoryId: String(equipment.category_id ?? ""),
+        estimatedUnitPrice: estimatedUnitPrice > 0 ? estimatedUnitPrice : null,
+      };
+    })
+    .filter((item): item is InquiryOrderPrefill["items"][number] => Boolean(item));
+
+  return {
+    success: true,
+    data: {
+      inquiry: {
+        id: inquiry.id,
+        inquiryNo: inquiry.inquiry_no,
+        pricingMode,
+        plannedStartAt: inquiry.planned_start_at,
+        plannedEndAt: inquiry.planned_end_at,
+        projectLocation: inquiry.project_location,
+        remark: inquiry.remark,
+      },
+      customer: {
+        id: customer.id,
+        name: customer.name,
+        customer_no: customer.customer_no,
+        risk_level: customer.risk_level ?? "LOW",
+        is_blacklisted: Boolean(customer.is_blacklisted),
+        lock_ordering: Boolean(customer.lock_ordering),
+        credit_level: customer.credit_level ?? "B",
+        lock_reason: customer.lock_reason ?? null,
+      },
+      items,
+    },
+  };
+}
+
 // ─── Delete Draft Order ──────────────────────────────────────────────────
 
 export async function deleteDraftOrder(
@@ -896,10 +1110,14 @@ export async function deleteDraftOrder(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, primary_role")
     .eq("supabase_user_id", user.id)
     .maybeSingle();
   if (!profile) return { success: false, error: "用户档案不存在" };
+  const role = profile.primary_role ?? "";
+  if (!["SALES", "SALES_MANAGER", "SYSTEM_ADMIN"].includes(role)) {
+    return { success: false, error: "无权删除草稿订单" };
+  }
 
   if (!orderId || orderId.length < 10) {
     return { success: false, error: "订单ID无效" };
@@ -908,7 +1126,7 @@ export async function deleteDraftOrder(
   // Only allow deleting DRAFT orders
   const { data: order } = await supabase
     .from("rental_order")
-    .select("id, order_status, order_no")
+    .select("id, order_status, order_no, created_by, sales_user_id")
     .eq("id", orderId)
     .maybeSingle();
 
@@ -917,24 +1135,56 @@ export async function deleteDraftOrder(
     return { success: false, error: "只能删除草稿状态的订单" };
   }
 
-  // Delete items first, then the order
-  await supabase.from("rental_order_item").delete().eq("order_id", orderId);
-  const { error } = await supabase
-    .from("rental_order")
-    .delete()
-    .eq("id", orderId);
+  const { data: linkedInquiries, error: inquiryError } = await supabase
+    .from("rental_inquiry")
+    .update({
+      status: "CANCELLED",
+      converted_order_id: null,
+      updated_by: profile.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("converted_order_id", orderId)
+    .select("id");
+  if (inquiryError) return { success: false, error: inquiryError.message };
 
-  if (error) return { success: false, error: error.message };
+  const { error, count } = await supabase
+    .from("rental_order")
+    .delete({ count: "exact" })
+    .eq("id", orderId)
+    .eq("order_status", "DRAFT");
+
+  if (error || count !== 1) {
+    const linkedIds = (linkedInquiries ?? []).map((inquiry) => inquiry.id);
+    if (linkedIds.length > 0) {
+      await supabase
+        .from("rental_inquiry")
+        .update({
+          status: "CONVERTED",
+          converted_order_id: orderId,
+          updated_by: profile.id,
+          updated_at: new Date().toISOString(),
+        })
+        .in("id", linkedIds);
+    }
+    return { success: false, error: error?.message ?? "草稿订单未删除，请刷新后重试" };
+  }
 
   await supabase.from("audit_log").insert({
     actor_id: profile.id,
     action: "ORDER_DELETE",
     resource_type: "ORDER",
     resource_id: orderId,
-    detail: { order_no: order.order_no },
+    detail: { order_no: order.order_no, cancelled_inquiry_ids: (linkedInquiries ?? []).map((inquiry) => inquiry.id) },
   });
 
   revalidatePath("/sales/orders");
+  revalidatePath(`/sales/orders/${orderId}`);
+  for (const inquiry of linkedInquiries ?? []) {
+    revalidatePath(`/sales/inquiries/${inquiry.id}`);
+    revalidatePath(`/customer/inquiries/${inquiry.id}`);
+  }
+  revalidatePath("/sales/inquiries");
+  revalidatePath("/customer/inquiries");
   return { success: true, data: null };
 }
 

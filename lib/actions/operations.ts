@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { generateNo } from "@/lib/utils";
 import type { ActionResult } from "@/lib/action-result";
+import { pricingPreview } from "@/lib/actions/rental-order";
 
 type AuthContext = {
   profileId: string;
@@ -177,6 +178,16 @@ function addMonths(dateString: string, offset: number) {
   date.setUTCDate(1);
   date.setUTCMonth(date.getUTCMonth() + offset);
   return date.toISOString().slice(0, 10);
+}
+
+function parseJsonArray<T = Record<string, unknown>>(value: FormDataEntryValue | null): T[] | null {
+  if (typeof value !== "string" || !value.trim()) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed as T[] : null;
+  } catch {
+    return null;
+  }
 }
 
 async function refreshInsuranceCostAllocations(
@@ -501,9 +512,54 @@ export async function submitRentalInquiry(formData: FormData): Promise<ActionRes
     : str(formData, "customerId");
   if (!customerId) return { success: false, error: "客户信息不存在" };
 
-  const quantity = num(formData, "quantity", 1);
-  const unitPrice = num(formData, "estimatedUnitPrice", 0);
-  const amount = quantity * unitPrice;
+  const rawItems = parseJsonArray<{ equipmentId?: string; unitPrice?: number; depositAmount?: number; quantity?: number }>(formData.get("items"));
+  const pricingMode = str(formData, "pricingMode", "MONTHLY");
+  const plannedStartAt = str(formData, "plannedStartAt");
+  const plannedEndAt = str(formData, "plannedEndAt");
+  let inquiryItems: Array<{
+    equipment_id: string | null;
+    equipment_name: string | null;
+    quantity: number;
+    estimated_unit_price: number;
+    estimated_amount: number;
+  }> = [];
+  let amount = 0;
+
+  if (rawItems?.length) {
+    const previewForm = new FormData();
+    previewForm.set("pricingMode", pricingMode);
+    previewForm.set("plannedStartAt", plannedStartAt);
+    previewForm.set("plannedEndAt", plannedEndAt);
+    previewForm.set("items", JSON.stringify(rawItems.map((item) => ({
+      equipmentId: item.equipmentId,
+      unitPrice: item.unitPrice,
+      depositAmount: item.depositAmount ?? 0,
+      quantity: item.quantity ?? 1,
+    }))));
+    const preview = await pricingPreview(previewForm);
+    if (!preview.success) return { success: false, error: preview.error };
+
+    inquiryItems = preview.data.items.map((item) => ({
+      equipment_id: item.equipmentId,
+      equipment_name: `${item.equipmentNo} / ${item.name}`,
+      quantity: item.quantity,
+      estimated_unit_price: item.unitPrice,
+      estimated_amount: item.rentAmount,
+    }));
+    amount = preview.data.totalRentAmount;
+  } else {
+    const quantity = num(formData, "quantity", 1);
+    const unitPrice = num(formData, "estimatedUnitPrice", 0);
+    amount = quantity * unitPrice;
+    inquiryItems = [{
+      equipment_id: nullableStr(formData, "equipmentId"),
+      equipment_name: nullableStr(formData, "equipmentName"),
+      quantity,
+      estimated_unit_price: unitPrice,
+      estimated_amount: amount,
+    }];
+  }
+  if (inquiryItems.length === 0) return { success: false, error: "请选择询价设备" };
 
   const { data, error } = await supabase
     .from("rental_inquiry")
@@ -513,8 +569,9 @@ export async function submitRentalInquiry(formData: FormData): Promise<ActionRes
       contact_name: nullableStr(formData, "contactName"),
       contact_phone: nullableStr(formData, "contactPhone"),
       project_location: nullableStr(formData, "projectLocation"),
-      planned_start_at: isoOrNull(str(formData, "plannedStartAt")),
-      planned_end_at: isoOrNull(str(formData, "plannedEndAt")),
+      planned_start_at: isoOrNull(plannedStartAt),
+      planned_end_at: isoOrNull(plannedEndAt),
+      pricing_mode: pricingMode,
       estimated_amount: amount,
       remark: nullableStr(formData, "remark"),
       created_by: auth.profileId,
@@ -524,15 +581,18 @@ export async function submitRentalInquiry(formData: FormData): Promise<ActionRes
     .single();
   if (error) return { success: false, error: error.message };
 
-  const equipmentId = nullableStr(formData, "equipmentId");
-  await supabase.from("rental_inquiry_item").insert({
+  const { error: itemsError } = await supabase.from("rental_inquiry_item").insert(inquiryItems.map((item) => ({
     inquiry_id: data.id,
-    equipment_id: equipmentId,
-    equipment_name: nullableStr(formData, "equipmentName"),
-    quantity,
-    estimated_unit_price: unitPrice,
-    estimated_amount: amount,
-  });
+    equipment_id: item.equipment_id,
+    equipment_name: item.equipment_name,
+    quantity: item.quantity,
+    estimated_unit_price: item.estimated_unit_price,
+    estimated_amount: item.estimated_amount,
+  })));
+  if (itemsError) {
+    await supabase.from("rental_inquiry").delete().eq("id", data.id);
+    return { success: false, error: itemsError.message };
+  }
 
   await notifyRoles(supabase, SALES_ROLES, {
     type: "CUSTOMER_INQUIRY_SUBMITTED",
@@ -559,77 +619,92 @@ export async function convertInquiryToOrder(formData: FormData): Promise<ActionR
   const inquiryId = str(formData, "inquiryId");
   const { data: inquiry } = await supabase
     .from("rental_inquiry")
-    .select("*, items:rental_inquiry_item(*)")
+    .select("id, status, converted_order_id")
     .eq("id", inquiryId)
-    .single();
+    .maybeSingle();
   if (!inquiry) return { success: false, error: "询价不存在" };
+  if (inquiry.converted_order_id || inquiry.status === "CONVERTED") return { success: false, error: "询价已转为订单" };
+  if (["CANCELLED", "CLOSED"].includes(inquiry.status as string)) return { success: false, error: "询价已撤销或关闭" };
 
-  const { data: order, error } = await supabase
-    .from("rental_order")
-    .insert({
-      order_no: generateNo("RO"),
-      customer_id: inquiry.customer_id,
-      sales_user_id: auth.profileId,
-      order_type: "NORMAL",
-      order_status: "DRAFT",
-      pricing_mode: "MONTHLY",
-      planned_start_at: inquiry.planned_start_at,
-      planned_end_at: inquiry.planned_end_at,
-      total_rent_amount: inquiry.estimated_amount,
-      receivable_amount: inquiry.estimated_amount,
-      unpaid_amount: inquiry.estimated_amount,
-      remark: `由询价 ${inquiry.inquiry_no} 转化。${inquiry.remark ?? ""}`,
-      created_by: auth.profileId,
-      updated_by: auth.profileId,
-    })
-    .select("id")
-    .single();
-  if (error) return { success: false, error: error.message };
-
-  const items = ((inquiry.items ?? []) as Record<string, unknown>[]).filter((item) => item.equipment_id);
-  if (items.length > 0) {
-    await supabase.from("rental_order_item").insert(items.map((item) => ({
-      order_id: order.id,
-      equipment_id: item.equipment_id,
-      equipment_model_id: item.equipment_model_id ?? null,
-      quantity: item.quantity ?? 1,
-      pricing_mode: "MONTHLY",
-      standard_unit_price: item.estimated_unit_price ?? 0,
-      actual_unit_price: item.estimated_unit_price ?? 0,
-      rent_amount: item.estimated_amount ?? 0,
-      start_at: inquiry.planned_start_at,
-      end_at: inquiry.planned_end_at,
-      item_status: "PENDING",
-    })));
+  if (inquiry.status === "SUBMITTED") {
+    await supabase
+      .from("rental_inquiry")
+      .update({ status: "FOLLOWING", updated_by: auth.profileId, updated_at: new Date().toISOString() })
+      .eq("id", inquiryId)
+      .eq("status", "SUBMITTED");
+    revalidatePath("/sales/inquiries");
+    revalidatePath(`/sales/inquiries/${inquiryId}`);
+    revalidatePath("/customer/inquiries");
+    revalidatePath(`/customer/inquiries/${inquiryId}`);
   }
 
-  await supabase
-    .from("rental_inquiry")
-    .update({ status: "CONVERTED", converted_order_id: order.id, updated_by: auth.profileId, updated_at: new Date().toISOString() })
-    .eq("id", inquiryId);
-
-  revalidatePath("/sales/inquiries");
-  revalidatePath("/sales/orders");
-  if (formData.has("redirectTo")) redirectAfter(formData, `/sales/orders/${order.id}`);
-  return { success: true, data: { id: order.id as string } };
+  redirect(`/sales/orders/new?inquiryId=${encodeURIComponent(inquiryId)}`);
 }
 
-export async function updateInquiryStatus(formData: FormData): Promise<ActionResult<null>> {
+export async function cancelRentalInquiry(formData: FormData): Promise<ActionResult<null>> {
   const supabase = await createClient();
   const auth = await requireAuth();
   if ("error" in auth) return { success: false, error: auth.error };
-  if (!hasRole(auth.primaryRole, SALES_ROLES)) return { success: false, error: "无权更新询价" };
+  if (!hasRole(auth.primaryRole, [...CUSTOMER_ROLES, ...SALES_ROLES])) return { success: false, error: "无权撤销询价" };
 
   const inquiryId = str(formData, "inquiryId");
-  const { error } = await supabase
+  const customerId = hasRole(auth.primaryRole, CUSTOMER_ROLES) ? await currentCustomerId(auth.profileId) : null;
+  if (hasRole(auth.primaryRole, CUSTOMER_ROLES) && !customerId) return { success: false, error: "客户信息不存在" };
+
+  let inquiryQuery = supabase
     .from("rental_inquiry")
-    .update({ status: str(formData, "status", "FOLLOWING"), updated_by: auth.profileId, updated_at: new Date().toISOString() })
+    .select("id, inquiry_no, customer_id, status, converted_order_id")
     .eq("id", inquiryId);
+  if (customerId) inquiryQuery = inquiryQuery.eq("customer_id", customerId);
+  const { data: inquiry } = await inquiryQuery.maybeSingle();
+
+  if (!inquiry) return { success: false, error: "询价不存在或无权撤销" };
+  if (inquiry.converted_order_id || inquiry.status === "CONVERTED") {
+    return { success: false, error: "询价已转为订单，不能撤销" };
+  }
+  if (["CANCELLED", "CLOSED"].includes(inquiry.status as string)) {
+    return { success: false, error: "该询价已结束，无需重复撤销" };
+  }
+
+  let updateQuery = supabase
+    .from("rental_inquiry")
+    .update({ status: "CANCELLED", updated_by: auth.profileId, updated_at: new Date().toISOString() })
+    .eq("id", inquiryId);
+  if (customerId) updateQuery = updateQuery.eq("customer_id", customerId);
+  const { error } = await updateQuery;
   if (error) return { success: false, error: error.message };
 
+  if (hasRole(auth.primaryRole, CUSTOMER_ROLES)) {
+    await notifyRoles(supabase, SALES_ROLES, {
+      type: "CUSTOMER_INQUIRY_CANCELLED",
+      title: "客户撤销租赁询价",
+      content: `客户撤销了询价 ${inquiry.inquiry_no ?? ""}。`,
+      businessType: "RENTAL_INQUIRY",
+      businessId: inquiryId,
+      actionUrl: `/sales/inquiries/${inquiryId}`,
+      level: "WARNING",
+      dedupeKey: `inquiry-cancelled:${inquiryId}`,
+    });
+  } else {
+    await notifyCustomerOwner(supabase, inquiry.customer_id, {
+      type: "SALES_INQUIRY_CANCELLED",
+      title: "询价已撤销",
+      content: `您的询价 ${inquiry.inquiry_no ?? ""} 已由业务人员撤销。`,
+      businessType: "RENTAL_INQUIRY",
+      businessId: inquiryId,
+      actionUrl: `/customer/inquiries/${inquiryId}`,
+      level: "WARNING",
+      dedupeKey: `sales-inquiry-cancelled:${inquiryId}`,
+    });
+  }
+
+  revalidatePath("/customer/inquiries");
+  revalidatePath(`/customer/inquiries/${inquiryId}`);
   revalidatePath("/sales/inquiries");
   revalidatePath(`/sales/inquiries/${inquiryId}`);
-  if (formData.has("redirectTo")) redirectAfter(formData, `/sales/inquiries/${inquiryId}`);
+  if (formData.has("redirectTo")) {
+    redirectAfter(formData, hasRole(auth.primaryRole, CUSTOMER_ROLES) ? `/customer/inquiries/${inquiryId}` : `/sales/inquiries/${inquiryId}`);
+  }
   return { success: true, data: null };
 }
 
@@ -786,11 +861,52 @@ export async function reviewPaymentVoucher(formData: FormData): Promise<ActionRe
   if (!hasRole(auth.primaryRole, FINANCE_ROLES)) return { success: false, error: "无权审核付款凭证" };
 
   const voucherId = str(formData, "voucherId");
-  const status = str(formData, "status", "APPROVED");
+  const requestedStatus = str(formData, "status", "APPROVED");
+  if (!["APPROVED", "REJECTED"].includes(requestedStatus)) {
+    return { success: false, error: "无效的审核状态" };
+  }
+
+  const { data: existingVoucher, error: fetchError } = await supabase
+    .from("payment_voucher")
+    .select("id, customer_id, receivable_id, voucher_no, amount, payment_method, bank_flow_no, status, receivable:receivable_id(status, unpaid_amount)")
+    .eq("id", voucherId)
+    .maybeSingle();
+  if (fetchError) return { success: false, error: fetchError.message };
+  if (!existingVoucher) return { success: false, error: "付款凭证不存在" };
+  if (existingVoucher.status !== "SUBMITTED") return { success: false, error: "该付款凭证已处理" };
+
+  const finalStatus = requestedStatus === "APPROVED" ? "CONFIRMED" : "REJECTED";
+
+  if (requestedStatus === "APPROVED") {
+    if (!existingVoucher.receivable_id) return { success: false, error: "付款凭证未关联应收记录" };
+    const receivable = existingVoucher.receivable as { status?: string | null; unpaid_amount?: string | number | null } | null;
+    const unpaidAmount = Number(receivable?.unpaid_amount ?? 0);
+    const voucherAmount = Number(existingVoucher.amount ?? 0);
+    if (!receivable || receivable.status === "PAID" || unpaidAmount <= 0) {
+      return { success: false, error: "关联应收已结清，无需重复确认收款" };
+    }
+    if (voucherAmount <= 0) return { success: false, error: "付款金额必须大于 0" };
+    if (voucherAmount > unpaidAmount) return { success: false, error: "付款金额不能超过未收金额" };
+
+    const { data: reconciliation, error: reconcileError } = await supabase.rpc("process_payment_reconciliation", {
+      p_receivable_id: existingVoucher.receivable_id,
+      p_amount: voucherAmount,
+      p_payment_method: existingVoucher.payment_method ?? "BANK_TRANSFER",
+      p_payer_name: null,
+      p_bank_flow_no: existingVoucher.bank_flow_no ?? null,
+      p_user_id: auth.userId,
+    });
+    if (reconcileError) return { success: false, error: reconcileError.message };
+    const reconciliationResult = reconciliation as { success?: boolean; error?: string } | null;
+    if (reconciliationResult?.success === false) {
+      return { success: false, error: reconciliationResult.error ?? "确认收款失败" };
+    }
+  }
+
   const { data: voucher, error } = await supabase
     .from("payment_voucher")
     .update({
-      status,
+      status: finalStatus,
       review_comment: nullableStr(formData, "reviewComment"),
       reviewed_by: auth.profileId,
       reviewed_at: new Date().toISOString(),
@@ -802,17 +918,22 @@ export async function reviewPaymentVoucher(formData: FormData): Promise<ActionRe
   if (error) return { success: false, error: error.message };
 
   await notifyCustomerOwner(supabase, voucher.customer_id, {
-    type: `PAYMENT_VOUCHER_${status}`,
+    type: `PAYMENT_VOUCHER_${finalStatus}`,
     title: "付款凭证状态更新",
     content: `您的付款凭证 ${voucher.voucher_no ?? ""} 状态已更新。`,
     businessType: "PAYMENT_VOUCHER",
     businessId: voucher.id,
     actionUrl: "/customer/bills",
-    level: status === "REJECTED" ? "WARNING" : "SUCCESS",
-    dedupeKey: `voucher-status:${voucher.id}:${status}`,
+    level: finalStatus === "REJECTED" ? "WARNING" : "SUCCESS",
+    dedupeKey: `voucher-status:${voucher.id}:${finalStatus}`,
   });
 
   revalidatePath("/finance/payments");
+  revalidatePath(`/finance/payments/vouchers/${voucherId}`);
+  if (existingVoucher.receivable_id) {
+    revalidatePath(`/finance/receivables/${existingVoucher.receivable_id}`);
+    revalidatePath(`/customer/bills/${existingVoucher.receivable_id}`);
+  }
   revalidatePath("/customer/bills");
   if (formData.has("redirectTo")) redirectAfter(formData, "/finance/payments");
   return { success: true, data: null };
@@ -1167,7 +1288,7 @@ export async function handleEquipmentAlertForm(formData: FormData) { await actio
 export async function confirmPredictiveSuggestionForm(formData: FormData) { await actionToForm(confirmPredictiveSuggestion, formData); }
 export async function submitRentalInquiryForm(formData: FormData) { await actionToForm(submitRentalInquiry, formData); }
 export async function convertInquiryToOrderForm(formData: FormData) { await actionToForm(convertInquiryToOrder, formData); }
-export async function updateInquiryStatusForm(formData: FormData) { await actionToForm(updateInquiryStatus, formData); }
+export async function cancelRentalInquiryForm(formData: FormData) { await actionToForm(cancelRentalInquiry, formData); }
 export async function createContractSignTaskForm(formData: FormData) { await actionToForm(createContractSignTask, formData); }
 export async function markSignTaskSignedForm(formData: FormData) { await actionToForm(markSignTaskSigned, formData); }
 export async function submitPaymentVoucherForm(formData: FormData) { await actionToForm(submitPaymentVoucher, formData); }

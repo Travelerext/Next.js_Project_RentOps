@@ -1,9 +1,31 @@
 import { createClient } from "@/lib/supabase/server";
-import { Badge } from "@/components/ui/badge";
+import { DataPage } from "@/components/data/data-page";
+import { DataTable, type Column } from "@/components/data/data-table";
+import { ReceivableStatusBadge } from "@/components/ui/status-badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { RECEIVABLE_STATUS } from "@/lib/constants";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+
+type CustomerBillRow = {
+  id: string;
+  receivable_no: string;
+  receivable_type: string;
+  amount: string | number | null;
+  paid_amount: string | number | null;
+  unpaid_amount: string | number | null;
+  due_date: string | null;
+  status: string;
+};
+
+const columns: Column<CustomerBillRow>[] = [
+  { id: "no", header: "账单编号", cell: (row) => row.receivable_no },
+  { id: "type", header: "类型", cell: (row) => row.receivable_type },
+  { id: "due", header: "到期日", cell: (row) => formatDate(row.due_date) },
+  { id: "amount", header: "应收", cell: (row) => formatCurrency(row.amount ?? 0), className: "text-right tabular-nums" },
+  { id: "paid", header: "已付", cell: (row) => formatCurrency(row.paid_amount ?? 0), className: "text-right tabular-nums", hideOnMobile: true },
+  { id: "unpaid", header: "未付", cell: (row) => formatCurrency(row.unpaid_amount ?? 0), className: "text-right tabular-nums" },
+  { id: "status", header: "状态", cell: (row) => <ReceivableStatusBadge status={row.status} /> },
+];
 
 export default async function CustomerBillsPage() {
   const supabase = await createClient();
@@ -28,36 +50,29 @@ export default async function CustomerBillsPage() {
     .order("due_date", { ascending: true })
     .limit(30);
 
+  if (!customer) {
+    return (
+      <DataPage title="账单查询" subtitle="查看应收账单、付款状态和凭证记录" empty={false}>
+        <div className="surface-panel rounded-lg p-6 text-sm text-app-muted">
+          请先在{" "}
+          <Link href="/customer/profile" className="text-app-accent hover:underline">
+            客户资料
+          </Link>{" "}
+          绑定或创建客户档案。
+        </div>
+      </DataPage>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">账单查询</h1>
-        {!customer ? (
-          <p className="mt-2 text-sm text-app-muted">请先在 <Link href="/customer/profile" className="text-app-accent hover:underline">客户资料</Link> 绑定或创建客户档案。</p>
-        ) : null}
-      </div>
-      <div className="space-y-3">
-        {(receivables ?? []).map((r) => (
-          <Link key={r.id} href={`/customer/bills/${r.id}`} className="block rounded-lg border border-zinc-200 p-4 transition-colors hover:border-app-border-strong hover:bg-app-surface-muted/50 dark:border-zinc-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-mono text-sm font-medium">{r.receivable_no}</p>
-                <p className="text-sm text-zinc-500">类型: {r.receivable_type} | 到期: {formatDate(r.due_date)}</p>
-              </div>
-              <div className="text-right">
-                <p className="font-medium">{formatCurrency(r.unpaid_amount)}</p>
-                <p className="text-xs text-app-muted">应收 {formatCurrency(r.amount)} · 已付 {formatCurrency(r.paid_amount)}</p>
-                <Badge variant={r.status === "PAID" ? "success" : r.status === "OVERDUE" ? "danger" : "warning"}>
-                  {RECEIVABLE_STATUS[r.status as keyof typeof RECEIVABLE_STATUS] ?? r.status}
-                </Badge>
-              </div>
-            </div>
-          </Link>
-        ))}
-        {(!receivables || receivables.length === 0) && (
-          <p className="py-8 text-center text-zinc-500">暂无账单</p>
-        )}
-      </div>
-    </div>
+    <DataPage title="账单查询" subtitle="查看应收账单、付款状态和凭证记录" empty={false}>
+      <DataTable
+        columns={columns}
+        data={(receivables ?? []) as CustomerBillRow[]}
+        keyExtractor={(row) => row.id}
+        rowHref={(row) => `/customer/bills/${row.id}`}
+        emptyMessage="暂无账单"
+      />
+    </DataPage>
   );
 }
